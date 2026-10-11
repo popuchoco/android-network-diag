@@ -15,4 +15,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
-      - run: gradle assembleDebug lint
+      - name: Build and lint
+        shell: bash
+        run: |
+          set +e
+          set -o pipefail
+          gradle assembleDebug lint 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            {
+              echo '### Build failure output'
+              echo '```text'
+              tail -n 160 build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
