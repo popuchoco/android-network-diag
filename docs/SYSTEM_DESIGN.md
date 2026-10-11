@@ -31,6 +31,18 @@ Known MVP limits: UDP/IPv4 DNS only, one VPN at a time, no DNS-over-HTTPS inside
 - CSV writes occur after every confirmed result.
 - The next phase should add Room-backed sessions, pause/resume intervals, event annotations, export through Storage Access Framework, and reboot resumption only after explicit opt-in.
 
+## Planned connection model
+
+The current report answers whether the active Android network can reach the public internet. The next connection model will keep separate fields for:
+
+- logical path: direct, this app's DNS-only VPN, or an external VPN;
+- observable underlying transport: Wi-Fi, cellular, Ethernet, Bluetooth, or unknown;
+- local state: interface address, default gateway, private-address classification, captive portal, and validation;
+- cellular context: telephony availability, SIM readiness, and available/validated cellular networks;
+- blocking context: airplane mode, missing network, or permission-limited information.
+
+These fields prevent a VPN label from hiding the physical connection and allow Wi-Fi/LAN failure to be distinguished from public-internet failure. See [ROADMAP.md](ROADMAP.md) for staged implementation and privacy constraints.
+
 ## Security
 
 - HTTPS is required for all application probes.

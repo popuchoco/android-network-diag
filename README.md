@@ -36,6 +36,7 @@ The **Console** tab records diagnostic lifecycle events, keeps the newest 500 en
 - [Architecture](docs/ARCHITECTURE.md)
 - [System design](docs/SYSTEM_DESIGN.md)
 - [Development decisions](docs/DEVELOPMENT_DECISIONS.md)
+- [Product roadmap](docs/ROADMAP.md)
 - [Reference projects and licenses](THIRD_PARTY_REFERENCES.md)
 
 ## License

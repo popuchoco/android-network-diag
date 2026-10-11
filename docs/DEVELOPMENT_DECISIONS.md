@@ -39,3 +39,27 @@ Both projects were MIT at the revisions reviewed on 2026-10-11. Any copied code 
 ## ADR-009 — Bounded local diagnostic console
 
 Operational events use a small structured logger rather than capturing unrestricted Logcat. This avoids requiring privileged log access and reduces accidental collection of unrelated app data. The newest 500 entries persist privately; export uses Android's document picker so the destination and timing remain user-controlled.
+
+## ADR-010 — Roadmap is capability-led, not protocol-led
+
+Future work is ordered by the user question it can answer. Connection explainability comes before adding more protocols: airplane mode, underlying transport, local address/gateway, VPN context, and Wi-Fi/SIM combinations are higher priority than DoH, traceroute, charts, or proxy serving. The maintained scope and entry criteria live in [ROADMAP.md](ROADMAP.md).
+
+## ADR-011 — Telephony detail must use minimum permissions
+
+SIM and cellular diagnostics are accepted future features, but they must begin with `ConnectivityManager`, `NetworkCapabilities`, device feature detection, and non-sensitive SIM readiness APIs. Phone-state permissions are not assumed. If a useful state requires a runtime phone permission, the implementation must document why, handle denial without breaking Wi-Fi diagnostics, account for dual-SIM devices, and avoid exposing identifiers.
+
+## ADR-012 — VPN diagnostics separate logical and physical transport
+
+Reporting only `TRANSPORT_VPN` hides whether the device actually depends on Wi-Fi or cellular service. A future connection model will report the logical path and best observable underlying non-VPN transport separately. This app's DNS-only VPN should be labeled distinctly from an external VPN, but the UI must not claim a full/split-tunnel classification when Android does not provide enough evidence.
+
+## ADR-013 — Local-network checks remain bounded
+
+Local IP, gateway, private-address classification, captive-portal state, and a bounded gateway reachability check are accepted. Broad LAN scanning, device discovery, or unrestricted port scanning are not. Android ICMP limitations mean gateway reachability should use a small, time-bounded method and must be presented as evidence rather than proof that the gateway is healthy.
+
+## ADR-014 — Tests follow protocol risk
+
+Hand-written packet parsing requires focused unit tests and CI execution. The current IPv4 UDP DNS parser covers truncation, fragmentation, invalid UDP lengths, and reply address/port construction. IPv6, TCP fallback, checksum vectors, and fuzz cases must arrive with their own tests. Replacing the parser with a dependency still requires license, maintenance, size, and security review.
+
+## ADR-015 — Deferred transports and expensive features
+
+Bluetooth PAN and USB/RJ-45 Ethernet are recorded future transports but are not near-term priorities. Room history, configurable monitoring, charts, DoH, IPv6 DNS, network selection, WorkManager scheduling, controlled speed tests, root hosts management, and SOCKS5/proxy routing remain staged work with the prerequisites in the roadmap. Recording an item does not authorize background data use, new sensitive permissions, root operations, or a full-tunnel VPN.
