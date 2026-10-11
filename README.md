@@ -1,47 +1,123 @@
 # Android Network Diag
 
-Dark-mode Android network diagnostics app for Taiwan users, with three focused areas:
+[![Android CI](https://github.com/popuchoco/android-network-diag/actions/workflows/android.yml/badge.svg)](https://github.com/popuchoco/android-network-diag/actions/workflows/android.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-- **External network health** — verifies DNS and real HTTPS reachability instead of trusting the Wi-Fi icon alone.
-- **Chunghwa Telecom / HiNet** — checks the current Fastly-backed paths used by GitHub, X images, and Twitch static assets.
-- **DNS switching** — switches among Cloudflare, Google, and Quad9 with a local DNS-only `VpnService`, or opens Android Private DNS settings with the correct hostname copied.
+給台灣使用者的 Android 網路診斷工具。它不只看 Wi-Fi 圖示，而是透過 DNS、獨立 HTTPS 端點、Android 網路驗證狀態與公開 IP，確認裝置是否真的能連上外部網路。
 
-## Current MVP
+目前介面為繁體中文、僅提供深色模式，支援 Android 8.0 以上版本。
 
-- Manual layered connectivity check using Microsoft, Google, Cloudflare, DNS, public IP, and Android network validation.
-- Connection explanation with airplane-mode handling, VPN/underlying transport, local IP, gateway, captive-portal state, and permission-free cellular availability.
-- Foreground monitor with a 60-second interval, 5-second first-failure retry, consecutive-failure outage confirmation, and private CSV history.
-- Lightweight Fastly service checks without a high-volume speed test.
-- DNS-only local VPN forwarder; packets are forwarded to the selected resolver and are not sent to a remote VPN provider.
-- In-app diagnostic console with a bounded, persistent event log and user-selected plain-text export.
-- Dark mode only, Traditional Chinese UI, Android 8.0+ (`minSdk 26`).
+## 功能
 
-## Important platform limits
+### 外網健檢
 
-Android apps without root cannot safely edit `/system/etc/hosts`. The HiNet section therefore diagnoses and recommends routes; it does not claim to apply desktop-style hosts overrides. The DNS-only mode occupies Android's single VPN slot and cannot run beside another non-root VPN.
+- 同時測試 DNS、Google、Cloudflare 與 Microsoft 連線驗證端點。
+- 顯示 Android `VALIDATED`／captive portal 狀態與公開 IP。
+- 飛航模式開啟時停止外部探測，直接顯示原因。
+- 說明目前的連線來源：
+  - Wi-Fi、行動網路、乙太網路或 VPN
+  - VPN 底層可觀察到的 Wi-Fi／行動網路
+  - 本 App 的 DNS-only VPN 或外部 VPN
+  - 本機 IP、預設閘道與不需電話權限的行動網路可用性摘要
 
-## Build
+### 持續監控
 
-Requirements: JDK 17 and Android SDK 35.
+- 使用前景服務每 60 秒檢查一次外網。
+- 首次失敗後 5 秒複查，連續失敗才判定斷線。
+- 飛航模式期間暫停外部探測並更新通知與 Console。
+- 結果寫入 App 私有目錄中的 CSV，不會自動上傳。
+- Android 13 以上若拒絕通知權限，介面會說明對前景通知的影響。
+
+### HiNet／Fastly 路線
+
+- 以小型 Range request 檢查 GitHub、X 圖片與 Twitch 靜態資源等 Fastly 服務。
+- 只做低流量可達性與延遲檢查，不會暗中執行大型測速。
+- 可開啟 HiNet 官方測速頁面進行進一步確認。
+
+### DNS 切換
+
+- 內建 Cloudflare、Google 與 Quad9。
+- 可透過本機 DNS-only `VpnService` 切換 UDP/IPv4 DNS。
+- VPN 路由只包含合成 DNS 位址 `10.77.0.2/32`，不攔截一般網路流量。
+- 也可複製 DNS-over-TLS 主機名稱並開啟 Android Private DNS 設定。
+
+### 診斷 Console
+
+- 顯示健檢、Fastly、DNS VPN、監控與權限事件。
+- App 私有空間最多保留最新 500 筆。
+- 可清除紀錄，或透過 Android 系統文件選擇器匯出純文字 `.log`。
+- 只有使用者主動選擇目的地時才會匯出。
+
+## 平台限制
+
+- 一般 Android App 無法安全修改 `/system/etc/hosts`；HiNet 頁面只提供診斷，不宣稱能套用桌面版 hosts 修正。
+- Android 同一時間只有一個非 root VPN 插槽，因此 DNS-only 模式不能與其他 `VpnService` 同時使用。
+- DNS-only VPN 目前只支援 IPv4 UDP/53，尚未支援 IPv6、DNS over TCP 與 oversized response fallback。
+- VPN 的底層傳輸來自 Android 可觀察到的 Network；多網路或廠商客製系統下可能無法完整判斷。
+- 行動網路摘要刻意不要求 `READ_PHONE_STATE`，因此不讀取 SIM 識別資訊，也不保證能分辨所有雙卡狀態。
+
+## 隱私與網路連線
+
+本專案沒有帳號、analytics、廣告 SDK、遙測後端或遠端資料庫。診斷紀錄與監控 CSV 預設只保存在 App 私有空間。
+
+執行對應功能時會連線至：
+
+| 用途 | 端點 |
+|---|---|
+| Android 外網驗證 | Google、Cloudflare、Microsoft 連線驗證端點 |
+| DNS 測試 | `www.hinet.net` |
+| 公開 IP | `api64.ipify.org`，失敗時才改用 `ifconfig.me/ip` |
+| Fastly 路線測試 | UI 中列出的 GitHub、X、Twitch 服務網域 |
+| 官方測速 | 僅在使用者點擊後開啟 `speed.hinet.net` |
+
+公開 IP 服務必然會看到請求來源的公網位址。App 不會把取得的結果送往自己的伺服器。
+
+## 建置與測試
+
+需求：
+
+- JDK 17
+- Android SDK Platform 35
+- Gradle 8.9（CI 會自動提供）
+
+目前 repository 未提交 Gradle Wrapper；本機請使用已安裝的 Gradle 8.9：
 
 ```powershell
-./gradlew.bat assembleDebug
+gradle assembleDebug testDebugUnitTest lint
 ```
 
-Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
+Debug APK：
 
-The **Console** tab records diagnostic lifecycle events, keeps the newest 500 entries in app-private storage, and exports a `.log` file through Android's system document picker. Export only happens after an explicit user action.
+```text
+app/build/outputs/apk/debug/app-debug.apk
+```
 
-Public-IP lookup tries `api64.ipify.org` first and `ifconfig.me/ip` only as a fallback. Both receive the device's public source address by necessity.
+GitHub Actions 會在每次 push 與 pull request 執行 APK 組裝、單元測試與 Android lint。
 
-## Documents
+## 專案結構
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [System design](docs/SYSTEM_DESIGN.md)
-- [Development decisions](docs/DEVELOPMENT_DECISIONS.md)
-- [Product roadmap](docs/ROADMAP.md)
-- [Reference projects and licenses](THIRD_PARTY_REFERENCES.md)
+```text
+app/src/main/java/tw/xiaoxin/networktool/
+├─ MainActivity.kt                 Compose UI
+├─ MainViewModel.kt                UI 狀態與診斷協調
+├─ net/
+│  ├─ NetworkDiagnostics.kt        DNS／HTTPS／公開 IP 健檢
+│  ├─ ConnectionExplainer.kt       傳輸、VPN、IP、閘道與網路狀態說明
+│  └─ FastlyDiagnostics.kt         低流量 Fastly 路線檢查
+├─ monitor/NetworkMonitorService.kt
+├─ dns/DnsVpnService.kt
+├─ log/DiagnosticLog.kt
+└─ model/
+```
 
-## License
+## 文件
 
-Apache License 2.0. See [LICENSE](LICENSE).
+- [架構說明](docs/ARCHITECTURE.md)
+- [系統設計](docs/SYSTEM_DESIGN.md)
+- [開發決策／ADR](docs/DEVELOPMENT_DECISIONS.md)
+- [產品 Roadmap](docs/ROADMAP.md)
+- [第三方參考與授權](THIRD_PARTY_REFERENCES.md)
+
+## 授權
+
+本專案採用 [Apache License 2.0](LICENSE)。第三方參考專案與其授權狀態請見 [THIRD_PARTY_REFERENCES.md](THIRD_PARTY_REFERENCES.md)。
