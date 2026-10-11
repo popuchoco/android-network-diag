@@ -27,3 +27,15 @@ Apache-2.0 and MIT projects informed the design. GPL projects were studied but n
 ## ADR-007 — Low-volume checks first
 
 The MVP uses small requests and range reads. High-volume scheduled speed tests need metered-network detection, a persistent cooldown, explicit consent, and provider backoff before implementation.
+
+## ADR-008 — Reference projects as capability research
+
+`AndroidProxy` is the relevant Android reference. Its cellular `Network` binding, service-owned status model, Happy Eyeballs behavior, and step-by-step self-test are suitable future features after they are rewritten behind this app's own interfaces and tests. Embedding its full SOCKS5 server is not part of the diagnostics MVP and would add NDK, background-service, authentication, and LAN exposure risks.
+
+`NetRedirector` is a Windows/WinDivert product. Its rule vocabulary, proxy health checks, failover concepts, and monitor UX are useful product references, but its packet interception, per-process routing, SoftEther, and driver implementation cannot be integrated into a regular Android app. Equivalent Android traffic routing would require a separate full-tunnel `VpnService` architecture and would conflict with the existing DNS-only VPN slot.
+
+Both projects were MIT at the revisions reviewed on 2026-10-11. Any copied code still requires retained copyright/license notices and a focused security review.
+
+## ADR-009 — Bounded local diagnostic console
+
+Operational events use a small structured logger rather than capturing unrestricted Logcat. This avoids requiring privileged log access and reduces accidental collection of unrelated app data. The newest 500 entries persist privately; export uses Android's document picker so the destination and timing remain user-controlled.

@@ -11,6 +11,7 @@ import kotlinx.coroutines.*
 import tw.xiaoxin.networktool.MainActivity
 import tw.xiaoxin.networktool.model.CheckState
 import tw.xiaoxin.networktool.net.NetworkDiagnostics
+import tw.xiaoxin.networktool.log.DiagnosticLog
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -21,10 +22,11 @@ class NetworkMonitorService : Service() {
     private var monitorJob: Job? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) { stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_STOP) { DiagnosticLog.info(this, "Monitor", "持續監控已停止"); stopSelf(); return START_NOT_STICKY }
         createChannel()
         startForeground(NOTIFICATION_ID, notification("準備第一次檢查", false))
         if (monitorJob?.isActive != true) monitorJob = scope.launch { monitorLoop() }
+        DiagnosticLog.info(this, "Monitor", "持續監控已啟動，間隔 60 秒")
         return START_STICKY
     }
 
@@ -40,11 +42,13 @@ class NetworkMonitorService : Service() {
                 delay(INTERVAL_MS)
             } else if (!firstFailure) {
                 firstFailure = true
+                DiagnosticLog.warning(this, "Monitor", "首次偵測不到外網，5 秒後複查")
                 notify("連線異常，5 秒後複查", true)
                 delay(RETRY_MS)
             } else {
                 firstFailure = false
                 save("OFFLINE", null)
+                DiagnosticLog.error(this, "Monitor", "連續兩次檢查失敗，確認斷線")
                 notify("已確認無法對外連線", true)
                 delay(INTERVAL_MS)
             }

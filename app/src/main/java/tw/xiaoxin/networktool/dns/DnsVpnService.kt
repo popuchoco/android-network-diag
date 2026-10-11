@@ -10,6 +10,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import tw.xiaoxin.networktool.MainActivity
+import tw.xiaoxin.networktool.log.DiagnosticLog
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.DatagramPacket
@@ -22,10 +23,11 @@ class DnsVpnService : VpnService() {
     private var executor = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) { stopVpn(); return Service.START_NOT_STICKY }
+        if (intent?.action == ACTION_STOP) { DiagnosticLog.info(this, "DNS", "DNS-only VPN 已停止"); stopVpn(); return Service.START_NOT_STICKY }
         val upstream = intent?.getStringExtra(EXTRA_DNS) ?: "1.1.1.1"
         startForeground(NOTIFICATION_ID, notification(upstream))
         startVpn(upstream)
+        DiagnosticLog.info(this, "DNS", "DNS-only VPN 已啟動，上游 $upstream")
         return Service.START_STICKY
     }
 
@@ -45,7 +47,10 @@ class DnsVpnService : VpnService() {
         val output = FileOutputStream(descriptor.fileDescriptor)
         val packet = ByteArray(32767)
         while (!Thread.interrupted()) {
-            val length = runCatching { input.read(packet) }.getOrElse { break }
+            val length = try { input.read(packet) } catch (error: Exception) {
+                DiagnosticLog.warning(this, "DNS", "TUN 讀取結束：${error.message ?: error.javaClass.simpleName}")
+                break
+            }
             if (length < 28) continue
             val request = DnsPacket.parse(packet, length) ?: continue
             val response = runCatching {

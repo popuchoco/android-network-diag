@@ -8,7 +8,6 @@ import android.content.Intent
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -18,6 +17,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -36,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import tw.xiaoxin.networktool.dns.DnsVpnService
 import tw.xiaoxin.networktool.monitor.NetworkMonitorService
+import tw.xiaoxin.networktool.log.DiagnosticLog
 import tw.xiaoxin.networktool.model.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -43,6 +45,7 @@ import java.util.*
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        DiagnosticLog.initialize(applicationContext)
         if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7)
         setContent { NetworkToolApp() }
     }
@@ -63,7 +66,7 @@ fun NetworkToolApp(vm: MainViewModel = viewModel()) {
             containerColor = Canvas,
             bottomBar = {
                 NavigationBar(containerColor = Panel, tonalElevation = 0.dp) {
-                    listOf("健檢" to Icons.Outlined.MonitorHeart, "中華電信" to Icons.Outlined.CellTower, "DNS" to Icons.Outlined.Dns).forEachIndexed { index, item ->
+                    listOf("健檢" to Icons.Outlined.MonitorHeart, "中華電信" to Icons.Outlined.CellTower, "DNS" to Icons.Outlined.Dns, "Console" to Icons.Outlined.Terminal).forEachIndexed { index, item ->
                         NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { Icon(item.second, null) }, label = { Text(item.first) })
                     }
                 }
@@ -72,7 +75,8 @@ fun NetworkToolApp(vm: MainViewModel = viewModel()) {
             when (tab) {
                 0 -> HealthScreen(vm, Modifier.padding(padding))
                 1 -> HinetScreen(vm, Modifier.padding(padding))
-                else -> DnsScreen(Modifier.padding(padding))
+                2 -> DnsScreen(Modifier.padding(padding))
+                else -> ConsoleScreen(Modifier.padding(padding))
             }
         }
     }
@@ -135,6 +139,7 @@ private fun HealthScreen(vm: MainViewModel, modifier: Modifier) {
 private fun HinetScreen(vm: MainViewModel, modifier: Modifier) {
     val results by vm.fastly.collectAsStateWithLifecycle()
     val checking by vm.fastlyChecking.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     Page("中華電信專區", "檢查 HiNet 到 Fastly 服務的實際路由表現，找出 GitHub、X 與 Twitch 的卡點。", modifier) {
         InfoCard(Icons.Outlined.Info, "Android 限制", "一般 App 無法修改系統 hosts。本區提供可驗證的路由診斷；若裝置有 root，才適合另加 hosts 套用模式。")
         Spacer(Modifier.height(16.dp))
@@ -146,7 +151,7 @@ private fun HinetScreen(vm: MainViewModel, modifier: Modifier) {
             Spacer(Modifier.width(10.dp)); Text(if (checking) "正在測試路線…" else "測試 Fastly 服務")
         }
         Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { openUrl(LocalContext.current, "https://speed.hinet.net/") }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(14.dp)) {
+        OutlinedButton(onClick = { openUrl(context, "https://speed.hinet.net/") }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(14.dp)) {
             Icon(Icons.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text("開啟 HiNet 官方測速")
         }
     }
@@ -179,12 +184,70 @@ private fun DnsScreen(modifier: Modifier) {
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = {
             copy(context, selected.privateDnsHost)
-            context.startActivity(Intent(Settings.ACTION_PRIVATE_DNS_SETTINGS))
+            context.startActivity(Intent("android.settings.PRIVATE_DNS_SETTINGS"))
         }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(14.dp)) {
             Icon(Icons.Outlined.Settings, null); Spacer(Modifier.width(8.dp)); Text("改用系統 Private DNS")
         }
         Spacer(Modifier.height(12.dp))
         Text("提示：Private DNS 使用主機名稱（已複製 ${selected.privateDnsHost}）；DNS-only VPN 會占用 Android 唯一的 VPN 插槽。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
+    }
+}
+
+@Composable
+private fun ConsoleScreen(modifier: Modifier) {
+    val context = LocalContext.current
+    val entries by DiagnosticLog.entries.collectAsStateWithLifecycle()
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(DiagnosticLog.exportText()) }
+        }.onSuccess {
+            DiagnosticLog.info(context, "Console", "診斷記錄已匯出")
+        }.onFailure {
+            DiagnosticLog.error(context, "Console", "匯出失敗：${it.message ?: it.javaClass.simpleName}")
+        }
+    }
+    Column(modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        Spacer(Modifier.height(20.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("診斷 Console", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text("${entries.size} 筆・最多保留 500 筆", color = Ink.copy(alpha = .62f), fontSize = 14.sp)
+            }
+            IconButton(onClick = { DiagnosticLog.clear(context) }) { Icon(Icons.Outlined.DeleteSweep, "清除記錄") }
+        }
+        Spacer(Modifier.height(12.dp))
+        Button(
+            onClick = { exportLauncher.launch("network-diag-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.log") },
+            enabled = entries.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+            shape = RoundedCornerShape(8.dp),
+        ) {
+            Icon(Icons.Outlined.FileDownload, null)
+            Spacer(Modifier.width(8.dp))
+            Text("匯出 Log")
+        }
+        Spacer(Modifier.height(12.dp))
+        if (entries.isEmpty()) {
+            EmptyPanel("尚無診斷記錄", "執行健檢、Fastly 測試，或啟動監控後，事件會顯示在這裡。")
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f).background(Color(0xFF090C0A), RoundedCornerShape(8.dp)),
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(entries.asReversed()) { entry ->
+                    Text(
+                        DiagnosticLog.format(entry),
+                        color = when (entry.level) { "ERROR" -> Color(0xFFFF8A80); "WARN" -> Color(0xFFFFC96B); else -> Ink.copy(alpha = .86f) },
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
     }
 }
 

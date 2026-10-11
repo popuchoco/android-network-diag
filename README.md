@@ -12,6 +12,7 @@ Dark-mode Android network diagnostics app for Taiwan users, with three focused a
 - Foreground monitor with a 60-second interval, 5-second first-failure retry, consecutive-failure outage confirmation, and private CSV history.
 - Lightweight Fastly service checks without a high-volume speed test.
 - DNS-only local VPN forwarder; packets are forwarded to the selected resolver and are not sent to a remote VPN provider.
+- In-app diagnostic console with a bounded, persistent event log and user-selected plain-text export.
 - Dark mode only, Traditional Chinese UI, Android 8.0+ (`minSdk 26`).
 
 ## Important platform limits
@@ -27,6 +28,8 @@ Requirements: JDK 17 and Android SDK 35.
 ```
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
+
+The **Console** tab records diagnostic lifecycle events, keeps the newest 500 entries in app-private storage, and exports a `.log` file through Android's system document picker. Export only happens after an explicit user action.
 
 ## Documents
 

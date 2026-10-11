@@ -15,5 +15,7 @@ No source code from the projects below is vendored in this repository. They were
 | [network-monitor](https://github.com/Debatej2299q/network-monitor) | MIT | Mobile dashboard metrics and presentation concepts |
 | [keepitup](https://github.com/ibbaa/keepitup) | Apache-2.0 | Foreground monitoring, configurable tasks, failure/recovery notification concepts |
 | [PCAPdroid](https://github.com/emanuele-f/PCAPdroid) | GPL (see upstream COPYING) | Mature no-root VPN architecture and local-processing expectations; not embedded |
+| [AndroidProxy / 5G Proxy Pro](https://github.com/tokyoxpa3/AndroidProxy) | MIT | Cellular-network socket binding, service-owned status, health checks, and diagnostic-report UX; no source copied |
+| [NetRedirector](https://github.com/tokyoxpa3/NetRedirector) | MIT | Proxy/rule vocabulary, health checks, failover, and traffic-monitor UX; Windows WinDivert core is not Android-compatible and no source was copied |
 
 Before importing any future dependency, pin a version, re-check its exact license at that revision, record notices, and review transitive dependencies.

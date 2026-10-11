@@ -28,3 +28,7 @@ The MVP uses one Android application module and keeps protocol engines separate 
 - No analytics, account, remote database, or telemetry SDK is included.
 - The DNS VPN does not capture general traffic because its route contains only the synthetic DNS address (`10.77.0.2/32`).
 - Public-IP lookup necessarily contacts `api64.ipify.org`; connectivity probes contact the providers named in the UI.
+
+## Diagnostic console
+
+`DiagnosticLog` keeps the newest 500 structured lifecycle events in memory and app-private storage. The Console renders them newest-first and exports through the Storage Access Framework. Entries stay private until the user explicitly exports or clears them, and can include public IP and network test outcomes.
