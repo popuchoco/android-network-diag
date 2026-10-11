@@ -99,8 +99,8 @@ private fun Page(title: String, subtitle: String, modifier: Modifier = Modifier,
 private fun HealthScreen(vm: MainViewModel, modifier: Modifier) {
     val report by vm.report.collectAsStateWithLifecycle()
     val checking by vm.checking.collectAsStateWithLifecycle()
+    val monitoring by ServiceState.monitoring.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var monitoring by rememberSaveable { mutableStateOf(false) }
     Page("外網健檢", "不是只看 Wi‑Fi 圖示，而是實際確認裝置能否連到外部網路。", modifier) {
         Card(colors = CardDefaults.cardColors(containerColor = if (report.validated) Mint else Panel), shape = RoundedCornerShape(12.dp), border = CardDefaults.outlinedCardBorder()) {
             Column(Modifier.padding(24.dp)) {
@@ -125,7 +125,6 @@ private fun HealthScreen(vm: MainViewModel, modifier: Modifier) {
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = {
             if (monitoring) stopMonitor(context) else startMonitor(context)
-            monitoring = !monitoring
         }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(14.dp)) {
             Icon(if (monitoring) Icons.Outlined.Pause else Icons.Outlined.NotificationsActive, null)
             Spacer(Modifier.width(8.dp)); Text(if (monitoring) "停止每分鐘監控" else "開始每分鐘監控")
@@ -161,22 +160,23 @@ private fun HinetScreen(vm: MainViewModel, modifier: Modifier) {
 private fun DnsScreen(modifier: Modifier) {
     val context = LocalContext.current
     var selected by rememberSaveable { mutableStateOf(dnsProviders.first()) }
-    var active by rememberSaveable { mutableStateOf(false) }
+    val dnsUpstream by ServiceState.dnsUpstream.collectAsStateWithLifecycle()
+    val active = dnsUpstream != null
     var pending by remember { mutableStateOf<DnsProvider?>(null) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        pending?.let { startDns(context, it.primary); active = true }; pending = null
+        pending?.let { startDns(context, it.primary) }; pending = null
     }
     Page("DNS 切換", "用本機 DNS-only VPN 切換解析服務；流量不會送往第三方 VPN 業者。", modifier) {
         dnsProviders.forEach { provider ->
-            DnsChoice(provider, selected == provider, active && selected == provider) { selected = provider }
+            DnsChoice(provider, selected == provider, dnsUpstream == provider.primary) { selected = provider }
             Spacer(Modifier.height(10.dp))
         }
         Spacer(Modifier.height(10.dp))
         Button(onClick = {
-            if (active) { stopDns(context); active = false }
+            if (active) stopDns(context)
             else {
                 val prepare = VpnService.prepare(context)
-                if (prepare != null) { pending = selected; vpnLauncher.launch(prepare) } else { startDns(context, selected.primary); active = true }
+                if (prepare != null) { pending = selected; vpnLauncher.launch(prepare) } else startDns(context, selected.primary)
             }
         }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(16.dp), colors = ButtonDefaults.buttonColors(containerColor = if (active) Ink else Moss)) {
             Icon(if (active) Icons.Outlined.Stop else Icons.Outlined.Shield, null); Spacer(Modifier.width(8.dp)); Text(if (active) "停止 DNS 切換" else "套用 ${selected.name}")

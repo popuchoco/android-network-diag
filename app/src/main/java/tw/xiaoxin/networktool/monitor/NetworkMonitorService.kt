@@ -10,6 +10,7 @@ import android.os.IBinder
 import kotlinx.coroutines.*
 import tw.xiaoxin.networktool.MainActivity
 import tw.xiaoxin.networktool.model.CheckState
+import tw.xiaoxin.networktool.model.ServiceState
 import tw.xiaoxin.networktool.net.NetworkDiagnostics
 import tw.xiaoxin.networktool.log.DiagnosticLog
 import java.io.File
@@ -22,10 +23,11 @@ class NetworkMonitorService : Service() {
     private var monitorJob: Job? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) { DiagnosticLog.info(this, "Monitor", "持續監控已停止"); stopSelf(); return START_NOT_STICKY }
+        if (intent?.action == ACTION_STOP) { DiagnosticLog.info(this, "Monitor", "持續監控已停止"); ServiceState.setMonitoring(false); stopSelf(); return START_NOT_STICKY }
         createChannel()
         startForeground(NOTIFICATION_ID, notification("準備第一次檢查", false))
         if (monitorJob?.isActive != true) monitorJob = scope.launch { monitorLoop() }
+        ServiceState.setMonitoring(true)
         DiagnosticLog.info(this, "Monitor", "持續監控已啟動，間隔 60 秒")
         return START_STICKY
     }
@@ -73,7 +75,7 @@ class NetworkMonitorService : Service() {
             .setContentTitle("網路工具箱").setContentText(text).setContentIntent(pending).setOngoing(true).build()
     }
 
-    override fun onDestroy() { scope.cancel(); super.onDestroy() }
+    override fun onDestroy() { ServiceState.setMonitoring(false); scope.cancel(); super.onDestroy() }
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {

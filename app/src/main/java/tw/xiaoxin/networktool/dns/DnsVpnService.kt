@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import tw.xiaoxin.networktool.MainActivity
 import tw.xiaoxin.networktool.log.DiagnosticLog
+import tw.xiaoxin.networktool.model.ServiceState
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.DatagramPacket
@@ -26,20 +27,26 @@ class DnsVpnService : VpnService() {
         if (intent?.action == ACTION_STOP) { DiagnosticLog.info(this, "DNS", "DNS-only VPN 已停止"); stopVpn(); return Service.START_NOT_STICKY }
         val upstream = intent?.getStringExtra(EXTRA_DNS) ?: "1.1.1.1"
         startForeground(NOTIFICATION_ID, notification(upstream))
-        startVpn(upstream)
-        DiagnosticLog.info(this, "DNS", "DNS-only VPN 已啟動，上游 $upstream")
+        if (startVpn(upstream)) {
+            ServiceState.setDnsUpstream(upstream)
+            DiagnosticLog.info(this, "DNS", "DNS-only VPN 已啟動，上游 $upstream")
+        } else {
+            DiagnosticLog.error(this, "DNS", "無法建立 DNS-only VPN")
+            stopVpn()
+        }
         return Service.START_STICKY
     }
 
-    private fun startVpn(upstream: String) {
+    private fun startVpn(upstream: String): Boolean {
         tun?.close()
         val builder = Builder().setSession("網路工具箱 DNS").setMtu(1500)
             .addAddress(VPN_ADDRESS, 24).addDnsServer(VPN_DNS).addRoute(VPN_DNS, 32)
         if (Build.VERSION.SDK_INT >= 29) builder.setBlocking(true)
         tun = builder.establish()
-        val descriptor = tun ?: return
+        val descriptor = tun ?: return false
         if (executor.isShutdown) executor = Executors.newSingleThreadExecutor()
         executor.execute { forwardDns(descriptor, upstream) }
+        return true
     }
 
     private fun forwardDns(descriptor: ParcelFileDescriptor, upstream: String) {
@@ -76,7 +83,7 @@ class DnsVpnService : VpnService() {
             .setContentText("目前使用 $upstream").setContentIntent(pending).setOngoing(true).build()
     }
 
-    private fun stopVpn() { runCatching { tun?.close() }; tun = null; executor.shutdownNow(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+    private fun stopVpn() { ServiceState.setDnsUpstream(null); runCatching { tun?.close() }; tun = null; executor.shutdownNow(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
     override fun onDestroy() { stopVpn(); super.onDestroy() }
 
     companion object {
@@ -90,14 +97,18 @@ class DnsVpnService : VpnService() {
     }
 }
 
-private data class DnsPacket(val source: ByteArray, val destination: ByteArray, val sourcePort: Int, val payload: ByteArray) {
+internal data class DnsPacket(val source: ByteArray, val destination: ByteArray, val sourcePort: Int, val payload: ByteArray) {
     companion object {
         fun parse(packet: ByteArray, length: Int): DnsPacket? {
+            if (length !in 28..packet.size) return null
             if (((packet[0].toInt() ushr 4) and 0xF) != 4) return null
             val ihl = (packet[0].toInt() and 0xF) * 4
-            if ((packet[9].toInt() and 0xFF) != 17 || length < ihl + 8 || u16(packet, ihl + 2) != 53) return null
-            val payloadEnd = minOf(length, ihl + u16(packet, ihl + 4))
-            if (payloadEnd < ihl + 8) return null
+            if (ihl < 20 || length < ihl + 8 || u16(packet, 2) !in (ihl + 8)..length) return null
+            if ((u16(packet, 6) and 0x3FFF) != 0) return null
+            if ((packet[9].toInt() and 0xFF) != 17 || u16(packet, ihl + 2) != 53) return null
+            val udpLength = u16(packet, ihl + 4)
+            if (udpLength < 8 || ihl + udpLength > u16(packet, 2)) return null
+            val payloadEnd = ihl + udpLength
             return DnsPacket(packet.copyOfRange(12, 16), packet.copyOfRange(16, 20), u16(packet, ihl), packet.copyOfRange(ihl + 8, payloadEnd))
         }
 

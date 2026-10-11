@@ -20,7 +20,7 @@ jobs:
         run: |
           set +e
           set -o pipefail
-          gradle assembleDebug lint 2>&1 | tee build.log
+          gradle assembleDebug testDebugUnitTest lint 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             {
