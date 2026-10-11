@@ -50,7 +50,7 @@ SIM and cellular diagnostics are accepted future features, but they must begin w
 
 ## ADR-012 — VPN diagnostics separate logical and physical transport
 
-Reporting only `TRANSPORT_VPN` hides whether the device actually depends on Wi-Fi or cellular service. A future connection model will report the logical path and best observable underlying non-VPN transport separately. This app's DNS-only VPN should be labeled distinctly from an external VPN, but the UI must not claim a full/split-tunnel classification when Android does not provide enough evidence.
+Reporting only `TRANSPORT_VPN` hides whether the device actually depends on Wi-Fi or cellular service. The connection model now reports the logical path and best observable underlying non-VPN transport separately. This app's DNS-only VPN is labeled distinctly from an external VPN, but the UI does not claim a full/split-tunnel classification when Android does not provide enough evidence.
 
 ## ADR-013 — Local-network checks remain bounded
 

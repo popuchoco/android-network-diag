@@ -5,6 +5,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -46,7 +47,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         DiagnosticLog.initialize(applicationContext)
-        if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7)
         setContent { NetworkToolApp() }
     }
 }
@@ -60,7 +60,20 @@ private val Line = Color(0xFF2C3631)
 
 @Composable
 fun NetworkToolApp(vm: MainViewModel = viewModel()) {
+    val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var notificationPermissionGranted by remember {
+        mutableStateOf(Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        notificationPermissionGranted = granted
+        if (!granted) DiagnosticLog.warning(context, "Permission", "通知權限被拒絕，持續監控通知可能無法顯示")
+    }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33 && !notificationPermissionGranted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     MaterialTheme(colorScheme = darkColorScheme(primary = Moss, onPrimary = Color(0xFF082116), background = Canvas, surface = Panel, onSurface = Ink, outline = Line)) {
         Scaffold(
             containerColor = Canvas,
@@ -73,7 +86,7 @@ fun NetworkToolApp(vm: MainViewModel = viewModel()) {
             }
         ) { padding ->
             when (tab) {
-                0 -> HealthScreen(vm, Modifier.padding(padding))
+                0 -> HealthScreen(vm, notificationPermissionGranted, Modifier.padding(padding))
                 1 -> HinetScreen(vm, Modifier.padding(padding))
                 2 -> DnsScreen(Modifier.padding(padding))
                 else -> ConsoleScreen(Modifier.padding(padding))
@@ -96,12 +109,16 @@ private fun Page(title: String, subtitle: String, modifier: Modifier = Modifier,
 }
 
 @Composable
-private fun HealthScreen(vm: MainViewModel, modifier: Modifier) {
+private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boolean, modifier: Modifier) {
     val report by vm.report.collectAsStateWithLifecycle()
     val checking by vm.checking.collectAsStateWithLifecycle()
     val monitoring by ServiceState.monitoring.collectAsStateWithLifecycle()
     val context = LocalContext.current
     Page("外網健檢", "不是只看 Wi‑Fi 圖示，而是實際確認裝置能否連到外部網路。", modifier) {
+        report.connection?.takeIf { it.airplaneMode }?.let {
+            InfoCard(Icons.Outlined.AirplanemodeActive, "飛航模式已開啟", "已暫停外部探測，請關閉飛航模式後再檢查。")
+            Spacer(Modifier.height(16.dp))
+        }
         Card(colors = CardDefaults.cardColors(containerColor = if (report.validated) Mint else Panel), shape = RoundedCornerShape(12.dp), border = CardDefaults.outlinedCardBorder()) {
             Column(Modifier.padding(24.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -113,6 +130,10 @@ private fun HealthScreen(vm: MainViewModel, modifier: Modifier) {
                 Text("公開 IP", color = Ink.copy(alpha = .55f), fontSize = 13.sp)
                 Text(report.publicIp, fontSize = 22.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace)
             }
+        }
+        report.connection?.let { connection ->
+            Spacer(Modifier.height(16.dp))
+            ConnectionCard(connection)
         }
         Spacer(Modifier.height(16.dp))
         report.probes.forEach { ProbeRow(it); Spacer(Modifier.height(8.dp)) }
@@ -129,8 +150,42 @@ private fun HealthScreen(vm: MainViewModel, modifier: Modifier) {
             Icon(if (monitoring) Icons.Outlined.Pause else Icons.Outlined.NotificationsActive, null)
             Spacer(Modifier.width(8.dp)); Text(if (monitoring) "停止每分鐘監控" else "開始每分鐘監控")
         }
+        if (!notificationPermissionGranted) {
+            Spacer(Modifier.height(8.dp))
+            Text("尚未允許通知；持續監控仍可啟動，但系統可能不顯示其前景通知。", color = Color(0xFFFFC96B), fontSize = 13.sp, lineHeight = 18.sp)
+        }
         Spacer(Modifier.height(8.dp))
         Text("持續監控會保留通知；首次失敗於 5 秒後複查，連續失敗才記為斷線。原始紀錄儲存在 App 私有 CSV。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
+    }
+}
+
+@Composable
+private fun ConnectionCard(connection: ConnectionExplanation) {
+    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(8.dp), border = CardDefaults.outlinedCardBorder()) {
+        Column(Modifier.fillMaxWidth().padding(18.dp)) {
+            Text("連線來源", fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(connection.explanation, color = Ink.copy(alpha = .82f), fontSize = 14.sp)
+            Spacer(Modifier.height(12.dp))
+            val transport = when {
+                connection.isOwnDnsVpn && connection.underlyingTransport != null -> "DNS-only VPN（底層：${connection.underlyingTransport}）"
+                connection.logicalTransport == "VPN" && connection.underlyingTransport != null -> "外部 VPN（底層：${connection.underlyingTransport}）"
+                else -> connection.logicalTransport
+            }
+            ConnectionDetail("傳輸", transport)
+            connection.localAddresses.firstOrNull()?.let { ConnectionDetail("本機 IP", it) }
+            connection.gateway?.let { ConnectionDetail("閘道", it) }
+            ConnectionDetail("網路驗證", when { connection.isCaptivePortal -> "需要登入入口網站"; connection.isValidated -> "已驗證"; connection.hasInternet -> "尚未驗證"; else -> "無網際網路能力" })
+            connection.cellularSummary?.let { ConnectionDetail("行動網路", it) }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionDetail(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        Text(label, color = Ink.copy(alpha = .5f), fontSize = 13.sp, modifier = Modifier.width(76.dp))
+        Text(value, color = Ink.copy(alpha = .78f), fontSize = 13.sp, fontFamily = if (label.contains("IP")) FontFamily.Monospace else FontFamily.Default)
     }
 }
 

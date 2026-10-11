@@ -17,26 +17,39 @@ import java.net.URL
 
 class NetworkDiagnostics(private val context: Context) {
     suspend fun run(): NetworkReport = coroutineScope {
+        val connection = ConnectionExplainer(context).explain()
+        if (connection.airplaneMode) {
+            return@coroutineScope NetworkReport(
+                transport = connection.logicalTransport,
+                probes = listOf(ProbeResult("外部檢查", CheckState.Warning, connection.explanation)),
+                checkedAt = System.currentTimeMillis(),
+                connection = connection,
+            )
+        }
         val cm = context.getSystemService(ConnectivityManager::class.java)
         val caps = cm.activeNetwork?.let(cm::getNetworkCapabilities)
-        val transport = when {
-            caps == null -> "未連線"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "VPN"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi‑Fi"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "行動網路"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "乙太網路"
-            else -> "其他網路"
-        }
         val probes = listOf(
             async { dnsProbe() },
             async { httpProbe("Google 連線驗證", "https://connectivitycheck.gstatic.com/generate_204", setOf(204)) },
             async { httpProbe("Cloudflare 連線驗證", "https://cp.cloudflare.com/generate_204", setOf(204)) },
             async { httpProbe("Microsoft 連線驗證", "https://www.msftconnecttest.com/connecttest.txt", 200..399) },
         ).awaitAll()
-        val publicIp = withContext(Dispatchers.IO) {
-            runCatching { URL("https://api64.ipify.org").readText().trim() }.getOrDefault("無法取得")
-        }
-        NetworkReport(transport, caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true, publicIp, probes, System.currentTimeMillis())
+        val publicIp = fetchPublicIp()
+        NetworkReport(connection.logicalTransport, caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true, publicIp, probes, System.currentTimeMillis(), connection)
+    }
+
+    private suspend fun fetchPublicIp() = withContext(Dispatchers.IO) {
+        listOf("https://api64.ipify.org", "https://ifconfig.me/ip").firstNotNullOfOrNull { endpoint ->
+            runCatching {
+                val connection = URL(endpoint).openConnection() as HttpURLConnection
+                connection.connectTimeout = 4_000
+                connection.readTimeout = 4_000
+                connection.setRequestProperty("User-Agent", "NetworkTool/0.1")
+                val value = connection.inputStream.bufferedReader().use { it.readText().trim() }
+                connection.disconnect()
+                value.takeIf { it.isNotBlank() && it.length < 64 && runCatching { InetAddress.getByName(it) }.isSuccess }
+            }.getOrNull()
+        } ?: "無法取得"
     }
 
     private suspend fun dnsProbe() = withContext(Dispatchers.IO) {

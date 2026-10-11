@@ -12,16 +12,19 @@ This roadmap records accepted future directions from peer review and project res
 - UI state sourced from the running monitor and DNS services.
 - Defensive IPv4 UDP DNS packet parsing with unit coverage for truncation, fragmentation, invalid lengths, and reply addressing.
 - Unit tests included in GitHub CI.
+- Airplane-mode short-circuit for manual and continuous checks.
+- Logical VPN versus observable underlying transport, local IP/default gateway, validation/captive-portal state, and permission-free cellular availability.
+- Notification-permission denial guidance.
+- Public-IP fallback with strict timeouts.
+- Explicit consecutive-failure counter in continuous monitoring.
 
 ## Near term — high priority
 
 ### Explain the active connection
 
-- Detect airplane mode before running external probes. Show a direct explanation and avoid needless timeouts. Continuous monitoring should pause probes, update its notification, and write one explanatory console event.
-- Display the physical transport underneath a VPN, for example `VPN (underlying: Wi-Fi)` or `VPN (underlying: cellular)`.
-- Distinguish this app's DNS-only VPN from an external full-tunnel or split-tunnel VPN where Android exposes enough information.
-- Show local interface address, default gateway, private/public address classification, and validation/captive-portal capabilities from `LinkProperties` and `NetworkCapabilities`.
-- Explain common Wi-Fi-only states: no SIM with working Wi-Fi, no SIM and no network, or mobile data unavailable while Wi-Fi remains usable.
+- Validate the new airplane/VPN/Wi-Fi/cellular explanations across physical devices and vendor Android builds.
+- Improve multi-network selection when multiple non-VPN networks are simultaneously validated.
+- Expand Wi-Fi-only explanations if permission-free APIs can distinguish additional causes reliably.
 
 ### Cellular and SIM diagnostics
 
@@ -33,9 +36,6 @@ This roadmap records accepted future directions from peer review and project res
 
 ### Reliability and user guidance
 
-- Handle notification-permission denial explicitly and explain the effect on foreground monitoring.
-- Add one or more public-IP fallback providers with strict timeouts, documented privacy impact, and deterministic result selection.
-- Replace the monitor's `firstFailure` Boolean with an explicit consecutive-failure state/count before monitor behavior becomes configurable.
 - Add a lifecycle reconciliation mechanism only if device tests demonstrate that process/service teardown can leave `ServiceState` stale; do not rely on deprecated running-service enumeration as the default design.
 
 ## Mid term
@@ -89,4 +89,3 @@ Every roadmap feature should define:
 4. Data destinations and privacy disclosure.
 5. Unit or instrumentation coverage and a CI path.
 6. Interaction with external VPNs and the DNS-only VPN slot.
-

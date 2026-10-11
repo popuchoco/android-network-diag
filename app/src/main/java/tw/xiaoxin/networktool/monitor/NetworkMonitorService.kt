@@ -19,7 +19,8 @@ import java.util.*
 
 class NetworkMonitorService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var firstFailure = false
+    private var consecutiveFailures = 0
+    private var airplaneModeLogged = false
     private var monitorJob: Job? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -36,19 +37,27 @@ class NetworkMonitorService : Service() {
         val diagnostics = NetworkDiagnostics(this)
         while (currentCoroutineContext().isActive) {
             val report = diagnostics.run()
+            if (report.connection?.airplaneMode == true) {
+                consecutiveFailures = 0
+                if (!airplaneModeLogged) DiagnosticLog.warning(this, "Monitor", "飛航模式中，已暫停外部檢查")
+                airplaneModeLogged = true
+                notify("飛航模式中，已暫停檢查", true)
+                delay(INTERVAL_MS)
+                continue
+            }
+            airplaneModeLogged = false
             val online = report.probes.any { it.state == CheckState.Success }
             if (online) {
-                firstFailure = false
+                consecutiveFailures = 0
                 save("ONLINE", report.probes.mapNotNull { it.latencyMs }.average().takeIf { !it.isNaN() })
                 notify("連線正常 · ${report.transport}", false)
                 delay(INTERVAL_MS)
-            } else if (!firstFailure) {
-                firstFailure = true
+            } else if (++consecutiveFailures == 1) {
                 DiagnosticLog.warning(this, "Monitor", "首次偵測不到外網，5 秒後複查")
                 notify("連線異常，5 秒後複查", true)
                 delay(RETRY_MS)
             } else {
-                firstFailure = false
+                consecutiveFailures = 0
                 save("OFFLINE", null)
                 DiagnosticLog.error(this, "Monitor", "連續兩次檢查失敗，確認斷線")
                 notify("已確認無法對外連線", true)

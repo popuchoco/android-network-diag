@@ -9,6 +9,7 @@ Dark-mode Android network diagnostics app for Taiwan users, with three focused a
 ## Current MVP
 
 - Manual layered connectivity check using Microsoft, Google, Cloudflare, DNS, public IP, and Android network validation.
+- Connection explanation with airplane-mode handling, VPN/underlying transport, local IP, gateway, captive-portal state, and permission-free cellular availability.
 - Foreground monitor with a 60-second interval, 5-second first-failure retry, consecutive-failure outage confirmation, and private CSV history.
 - Lightweight Fastly service checks without a high-volume speed test.
 - DNS-only local VPN forwarder; packets are forwarded to the selected resolver and are not sent to a remote VPN provider.
@@ -30,6 +31,8 @@ Requirements: JDK 17 and Android SDK 35.
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
 The **Console** tab records diagnostic lifecycle events, keeps the newest 500 entries in app-private storage, and exports a `.log` file through Android's system document picker. Export only happens after an explicit user action.
+
+Public-IP lookup tries `api64.ipify.org` first and `ifconfig.me/ip` only as a fallback. Both receive the device's public source address by necessity.
 
 ## Documents
 
