@@ -16,7 +16,7 @@ The MVP uses one Android application module and keeps protocol engines separate 
 
 ## Responsibilities
 
-- `NetworkDiagnostics`: uses `ConnectionExplainer`, short-circuits external work in airplane mode, resolves `www.hinet.net`, probes three independent HTTPS connectivity endpoints, and retrieves the public IP with a fallback provider.
+- `NetworkDiagnostics`: uses `ConnectionExplainer`, short-circuits external work in airplane mode, resolves `www.hinet.net`, probes Google and Cloudflare HTTPS 204 endpoints, and retrieves the public IP with a fallback provider. The former Microsoft Windows connectivity endpoint was removed because it was not an Android requirement and produced unrelated CDN certificate failures on some VPN paths.
 - `ConnectionExplainer`: separates the logical VPN path from the best observable physical transport and reads local addresses, default gateway, validation/captive-portal capabilities, and permission-free cellular availability.
 - `FastlyDiagnostics`: resolves and performs small HTTP range checks against Fastly-backed service domains.
 - `NetworkMonitorService`: runs a foreground monitoring loop, retries the first failure after five seconds, confirms an outage only after consecutive failure, and appends private CSV history.

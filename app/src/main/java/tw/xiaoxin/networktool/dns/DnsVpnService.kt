@@ -24,28 +24,49 @@ class DnsVpnService : VpnService() {
     private var executor = Executors.newSingleThreadExecutor()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) { DiagnosticLog.info(this, "DNS", "DNS-only VPN 已停止"); stopVpn(); return Service.START_NOT_STICKY }
-        val upstream = intent?.getStringExtra(EXTRA_DNS) ?: "1.1.1.1"
-        startForeground(NOTIFICATION_ID, notification(upstream))
-        if (startVpn(upstream)) {
-            ServiceState.setDnsUpstream(upstream)
-            DiagnosticLog.info(this, "DNS", "DNS-only VPN 已啟動，上游 $upstream")
-        } else {
-            DiagnosticLog.error(this, "DNS", "無法建立 DNS-only VPN")
+        if (intent?.action == ACTION_STOP) {
+            DiagnosticLog.info(this, "DNS", "DNS-only VPN 已停止")
             stopVpn()
+            return Service.START_NOT_STICKY
         }
-        return Service.START_STICKY
+        return try {
+            val upstream = intent?.getStringExtra(EXTRA_DNS) ?: "1.1.1.1"
+            startForeground(NOTIFICATION_ID, notification(upstream))
+            if (startVpn(upstream)) {
+                ServiceState.setDnsUpstream(upstream)
+                DiagnosticLog.info(this, "DNS", "DNS-only VPN 已啟動，上游 $upstream")
+                Service.START_STICKY
+            } else {
+                DiagnosticLog.error(this, "DNS", "系統未建立 VPN 介面")
+                stopVpn()
+                Service.START_NOT_STICKY
+            }
+        } catch (error: Exception) {
+            DiagnosticLog.error(this, "DNS", "啟動失敗：${error.javaClass.simpleName}: ${error.message ?: "無詳細訊息"}")
+            cleanupVpn()
+            stopSelf()
+            Service.START_NOT_STICKY
+        }
     }
 
     private fun startVpn(upstream: String): Boolean {
-        tun?.close()
+        runCatching { tun?.close() }
         val builder = Builder().setSession("網路工具箱 DNS").setMtu(1500)
             .addAddress(VPN_ADDRESS, 24).addDnsServer(VPN_DNS).addRoute(VPN_DNS, 32)
         if (Build.VERSION.SDK_INT >= 29) builder.setBlocking(true)
-        tun = builder.establish()
+        tun = runCatching { builder.establish() }.getOrElse {
+            DiagnosticLog.error(this, "DNS", "建立 VPN 介面失敗：${it.javaClass.simpleName}: ${it.message ?: "無詳細訊息"}")
+            null
+        }
         val descriptor = tun ?: return false
         if (executor.isShutdown) executor = Executors.newSingleThreadExecutor()
-        executor.execute { forwardDns(descriptor, upstream) }
+        executor.execute {
+            runCatching { forwardDns(descriptor, upstream) }.onFailure {
+                DiagnosticLog.error(this, "DNS", "轉送執行緒失敗：${it.javaClass.simpleName}: ${it.message ?: "無詳細訊息"}")
+                cleanupVpn()
+                stopSelf()
+            }
+        }
         return true
     }
 
@@ -83,8 +104,20 @@ class DnsVpnService : VpnService() {
             .setContentText("目前使用 $upstream").setContentIntent(pending).setOngoing(true).build()
     }
 
-    private fun stopVpn() { ServiceState.setDnsUpstream(null); runCatching { tun?.close() }; tun = null; executor.shutdownNow(); stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
-    override fun onDestroy() { stopVpn(); super.onDestroy() }
+    private fun cleanupVpn() {
+        ServiceState.setDnsUpstream(null)
+        runCatching { tun?.close() }
+        tun = null
+        executor.shutdownNow()
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
+    }
+
+    private fun stopVpn() {
+        cleanupVpn()
+        stopSelf()
+    }
+
+    override fun onDestroy() { cleanupVpn(); super.onDestroy() }
 
     companion object {
         const val ACTION_START = "tw.xiaoxin.networktool.START_DNS"

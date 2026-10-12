@@ -10,7 +10,7 @@ import java.net.URL
 
 object FastlyDiagnostics {
     private val services = listOf(
-        "GitHub 下載" to "https://raw.githubusercontent.com/robots.txt",
+        "GitHub Raw" to "https://raw.githubusercontent.com/github/gitignore/main/README.md",
         "X 圖片" to "https://pbs.twimg.com/robots.txt",
         "Twitch 靜態資源" to "https://static-cdn.jtvnw.net/robots.txt",
     )

@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -334,7 +335,14 @@ private fun ProbeRow(item: ProbeResult) {
 @Composable private fun InfoCard(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, body: String) = Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF342B18)), shape = RoundedCornerShape(8.dp)) { Row(Modifier.padding(18.dp)) { Icon(icon, null, tint = Color(0xFFFFC96B)); Spacer(Modifier.width(12.dp)); Column { Text(title, fontWeight = FontWeight.SemiBold); Text(body, color = Ink.copy(alpha = .78f), fontSize = 14.sp, lineHeight = 20.sp) } } }
 @Composable private fun EmptyPanel(title: String, body: String) = Box(Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(8.dp)).padding(24.dp)) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Route, null, tint = Ink.copy(alpha = .6f), modifier = Modifier.size(34.dp)); Spacer(Modifier.height(12.dp)); Text(title, fontWeight = FontWeight.SemiBold); Text(body, color = Ink.copy(alpha = .72f), fontSize = 14.sp) } }
 
-private fun startDns(context: Context, dns: String) = ContextCompat.startForegroundService(context, Intent(context, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START).putExtra(DnsVpnService.EXTRA_DNS, dns))
+private fun startDns(context: Context, dns: String) {
+    runCatching {
+        ContextCompat.startForegroundService(context, Intent(context, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START).putExtra(DnsVpnService.EXTRA_DNS, dns))
+    }.onFailure {
+        DiagnosticLog.error(context, "DNS", "無法啟動服務：${it.javaClass.simpleName}: ${it.message ?: "無詳細訊息"}")
+        Toast.makeText(context, "無法啟動 DNS：${it.localizedMessage ?: "系統拒絕啟動服務"}", Toast.LENGTH_LONG).show()
+    }
+}
 private fun stopDns(context: Context) = context.startService(Intent(context, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP))
 private fun startMonitor(context: Context) = ContextCompat.startForegroundService(context, Intent(context, NetworkMonitorService::class.java).setAction(NetworkMonitorService.ACTION_START))
 private fun stopMonitor(context: Context) = context.startService(Intent(context, NetworkMonitorService::class.java).setAction(NetworkMonitorService.ACTION_STOP))

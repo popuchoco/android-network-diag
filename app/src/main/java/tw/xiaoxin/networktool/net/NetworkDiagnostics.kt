@@ -32,7 +32,6 @@ class NetworkDiagnostics(private val context: Context) {
             async { dnsProbe() },
             async { httpProbe("Google 連線驗證", "https://connectivitycheck.gstatic.com/generate_204", setOf(204)) },
             async { httpProbe("Cloudflare 連線驗證", "https://cp.cloudflare.com/generate_204", setOf(204)) },
-            async { httpProbe("Microsoft 連線驗證", "https://www.msftconnecttest.com/connecttest.txt", 200..399) },
         ).awaitAll()
         val publicIp = fetchPublicIp()
         NetworkReport(connection.logicalTransport, caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true, publicIp, probes, System.currentTimeMillis(), connection)

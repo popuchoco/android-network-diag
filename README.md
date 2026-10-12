@@ -11,7 +11,7 @@
 
 ### 外網健檢
 
-- 同時測試 DNS、Google、Cloudflare 與 Microsoft 連線驗證端點。
+- 同時測試 DNS、Android 使用的 Google 204 與獨立的 Cloudflare 204 端點。
 - 顯示 Android `VALIDATED`／captive portal 狀態與公開 IP。
 - 飛航模式開啟時停止外部探測，直接顯示原因。
 - 說明目前的連線來源：
@@ -64,7 +64,7 @@
 
 | 用途 | 端點 |
 |---|---|
-| Android 外網驗證 | Google、Cloudflare、Microsoft 連線驗證端點 |
+| Android 外網驗證 | Google 與 Cloudflare 204 端點 |
 | DNS 測試 | `www.hinet.net` |
 | 公開 IP | `api64.ipify.org`，失敗時才改用 `ifconfig.me/ip` |
 | Fastly 路線測試 | UI 中列出的 GitHub、X、Twitch 服務網域 |
