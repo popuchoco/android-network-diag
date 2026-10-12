@@ -20,7 +20,7 @@ The MVP uses one Android application module and keeps protocol engines separate 
 - `ConnectionExplainer`: separates the logical VPN path from the best observable physical transport and reads local addresses, default gateway, validation/captive-portal capabilities, and permission-free cellular availability.
 - `FastlyDiagnostics`: resolves and performs small HTTP range checks against Fastly-backed service domains.
 - `NetworkMonitorService`: runs a foreground monitoring loop, retries the first failure after five seconds, confirms an outage only after consecutive failure, and appends private CSV history.
-- `DnsVpnService`: captures only traffic addressed to the VPN-provided DNS IP, forwards UDP DNS to the selected resolver on a protected socket, and constructs the reply packet locally.
+- `DnsVpnService`: captures only traffic addressed to the VPN-provided DNS IP, forwards UDP DNS to the selected resolver on a protected socket, and constructs the reply packet locally. Establishment and forwarding failures are published through `ServiceState`, allowing the visible DNS screen to show an actionable error even though the failure occurs asynchronously inside the service.
 - Compose screens: presentation and user consent entry points only; network work stays off the main thread.
 
 ## Data and privacy

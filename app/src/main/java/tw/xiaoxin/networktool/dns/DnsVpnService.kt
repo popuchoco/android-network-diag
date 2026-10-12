@@ -20,6 +20,7 @@ import java.net.InetAddress
 import java.util.concurrent.Executors
 
 class DnsVpnService : VpnService() {
+    private val vpnLock = Any()
     private var tun: ParcelFileDescriptor? = null
     private var executor = Executors.newSingleThreadExecutor()
 
@@ -42,7 +43,9 @@ class DnsVpnService : VpnService() {
                 Service.START_NOT_STICKY
             }
         } catch (error: Exception) {
-            DiagnosticLog.error(this, "DNS", "啟動失敗：${error.javaClass.simpleName}: ${error.message ?: "無詳細訊息"}")
+            val message = "DNS 啟動失敗：${error.javaClass.simpleName}: ${error.message ?: "無詳細訊息"}"
+            DiagnosticLog.error(this, "DNS", message)
+            ServiceState.reportDnsError(message)
             cleanupVpn()
             stopSelf()
             Service.START_NOT_STICKY
@@ -50,20 +53,38 @@ class DnsVpnService : VpnService() {
     }
 
     private fun startVpn(upstream: String): Boolean {
-        runCatching { tun?.close() }
+        val previous = synchronized(vpnLock) { tun.also { tun = null } }
+        runCatching { previous?.close() }
         val builder = Builder().setSession("網路工具箱 DNS").setMtu(1500)
             .addAddress(VPN_ADDRESS, 24).addDnsServer(VPN_DNS).addRoute(VPN_DNS, 32)
         if (Build.VERSION.SDK_INT >= 29) builder.setBlocking(true)
-        tun = runCatching { builder.establish() }.getOrElse {
+        val descriptor = runCatching { builder.establish() }.getOrElse {
             DiagnosticLog.error(this, "DNS", "建立 VPN 介面失敗：${it.javaClass.simpleName}: ${it.message ?: "無詳細訊息"}")
             null
         }
-        val descriptor = tun ?: return false
+        if (descriptor == null) {
+            ServiceState.reportDnsError("無法建立 DNS VPN；請確認 VPN 權限，並關閉其他正在使用的 VPN")
+            return false
+        }
+        synchronized(vpnLock) { tun = descriptor }
         if (executor.isShutdown) executor = Executors.newSingleThreadExecutor()
         executor.execute {
-            runCatching { forwardDns(descriptor, upstream) }.onFailure {
-                DiagnosticLog.error(this, "DNS", "轉送執行緒失敗：${it.javaClass.simpleName}: ${it.message ?: "無詳細訊息"}")
-                cleanupVpn()
+            val failure = runCatching { forwardDns(descriptor, upstream) }.exceptionOrNull()
+            val wasCurrent = synchronized(vpnLock) {
+                if (tun === descriptor) {
+                    tun = null
+                    true
+                } else false
+            }
+            runCatching { descriptor.close() }
+            if (wasCurrent) {
+                val message = failure?.let {
+                    "DNS 轉送失敗：${it.javaClass.simpleName}: ${it.message ?: "無詳細訊息"}"
+                } ?: "DNS VPN 介面已意外結束"
+                DiagnosticLog.error(this, "DNS", message)
+                ServiceState.reportDnsError(message)
+                ServiceState.setDnsUpstream(null)
+                runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
                 stopSelf()
             }
         }
@@ -75,10 +96,8 @@ class DnsVpnService : VpnService() {
         val output = FileOutputStream(descriptor.fileDescriptor)
         val packet = ByteArray(32767)
         while (!Thread.interrupted()) {
-            val length = try { input.read(packet) } catch (error: Exception) {
-                DiagnosticLog.warning(this, "DNS", "TUN 讀取結束：${error.message ?: error.javaClass.simpleName}")
-                break
-            }
+            val length = input.read(packet)
+            if (length < 0) break
             if (length < 28) continue
             val request = DnsPacket.parse(packet, length) ?: continue
             val response = runCatching {
@@ -106,8 +125,8 @@ class DnsVpnService : VpnService() {
 
     private fun cleanupVpn() {
         ServiceState.setDnsUpstream(null)
-        runCatching { tun?.close() }
-        tun = null
+        val descriptor = synchronized(vpnLock) { tun.also { tun = null } }
+        runCatching { descriptor?.close() }
         executor.shutdownNow()
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
     }

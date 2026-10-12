@@ -63,3 +63,7 @@ Hand-written packet parsing requires focused unit tests and CI execution. The cu
 ## ADR-015 — Deferred transports and expensive features
 
 Bluetooth PAN and USB/RJ-45 Ethernet are recorded future transports but are not near-term priorities. Room history, configurable monitoring, charts, DoH, IPv6 DNS, network selection, WorkManager scheduling, controlled speed tests, root hosts management, and SOCKS5/proxy routing remain staged work with the prerequisites in the roadmap. Recording an item does not authorize background data use, new sensitive permissions, root operations, or a full-tunnel VPN.
+
+## ADR-016 — DNS service failures must reach the visible UI
+
+Starting a foreground service is asynchronous: a successful `startForegroundService` call does not prove that `VpnService.Builder.establish()` or the forwarding loop succeeded. The DNS service therefore owns failure detection and cleanup, publishes a transient user-facing error through `ServiceState`, and writes technical detail to the diagnostic console. The DNS screen consumes only the matching error value so an older UI callback cannot erase a newer failure. Normal stop closes the current descriptor first; a retired forwarding worker must not clear or stop a newer VPN session.

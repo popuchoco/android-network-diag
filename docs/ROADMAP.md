@@ -37,6 +37,7 @@ This roadmap records accepted future directions from peer review and project res
 ### Reliability and user guidance
 
 - Add a lifecycle reconciliation mechanism only if device tests demonstrate that process/service teardown can leave `ServiceState` stale; do not rely on deprecated running-service enumeration as the default design.
+- Run the maintained physical-device matrix for DNS start/stop, permission denial, an occupied VPN slot, rapid restart, network loss, process termination, airplane mode, external VPNs, Wi-Fi-only devices, cellular-only devices, captive portals, and dual-SIM devices. A checklist is not a completed result; record device model, Android version, network context, exported console log, and observed outcome for each run.
 
 ## Mid term
 

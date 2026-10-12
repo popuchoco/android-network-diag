@@ -217,10 +217,17 @@ private fun DnsScreen(modifier: Modifier) {
     val context = LocalContext.current
     var selected by rememberSaveable { mutableStateOf(dnsProviders.first()) }
     val dnsUpstream by ServiceState.dnsUpstream.collectAsStateWithLifecycle()
+    val dnsError by ServiceState.dnsError.collectAsStateWithLifecycle()
     val active = dnsUpstream != null
     var pending by remember { mutableStateOf<DnsProvider?>(null) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         pending?.let { startDns(context, it.primary) }; pending = null
+    }
+    LaunchedEffect(dnsError) {
+        dnsError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            ServiceState.consumeDnsError(it)
+        }
     }
     Page("DNS 切換", "用本機 DNS-only VPN 切換解析服務；流量不會送往第三方 VPN 業者。", modifier) {
         dnsProviders.forEach { provider ->
