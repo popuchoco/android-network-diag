@@ -17,6 +17,7 @@ This roadmap records accepted future directions from peer review and project res
 - Notification-permission denial guidance.
 - Public-IP fallback with strict timeouts.
 - Explicit consecutive-failure counter in continuous monitoring.
+- DNS selection state stored as a Bundle-safe provider ID, with VPN consent cancellation handled without starting the service.
 
 ## Near term — high priority
 

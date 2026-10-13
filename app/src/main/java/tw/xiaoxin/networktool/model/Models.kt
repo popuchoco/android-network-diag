@@ -30,3 +30,5 @@ val dnsProviders = listOf(
     DnsProvider("google", "Google", "8.8.8.8", "8.8.4.4", "dns.google"),
     DnsProvider("quad9", "Quad9", "9.9.9.9", "149.112.112.112", "dns.quad9.net"),
 )
+
+fun dnsProviderById(id: String): DnsProvider = dnsProviders.firstOrNull { it.id == id } ?: dnsProviders.first()

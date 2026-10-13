@@ -1,6 +1,7 @@
 package tw.xiaoxin.networktool
 
 import android.Manifest
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -215,13 +216,19 @@ private fun HinetScreen(vm: MainViewModel, modifier: Modifier) {
 @Composable
 private fun DnsScreen(modifier: Modifier) {
     val context = LocalContext.current
-    var selected by rememberSaveable { mutableStateOf(dnsProviders.first()) }
+    var selectedId by rememberSaveable { mutableStateOf(dnsProviders.first().id) }
+    val selected = dnsProviderById(selectedId)
     val dnsUpstream by ServiceState.dnsUpstream.collectAsStateWithLifecycle()
     val dnsError by ServiceState.dnsError.collectAsStateWithLifecycle()
     val active = dnsUpstream != null
     var pending by remember { mutableStateOf<DnsProvider?>(null) }
-    val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        pending?.let { startDns(context, it.primary) }; pending = null
+    val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            pending?.let { startDns(context, it.primary) }
+        } else {
+            DiagnosticLog.warning(context, "DNS", "使用者取消 VPN 授權，未啟動 DNS-only VPN")
+        }
+        pending = null
     }
     LaunchedEffect(dnsError) {
         dnsError?.let {
@@ -231,7 +238,7 @@ private fun DnsScreen(modifier: Modifier) {
     }
     Page("DNS 切換", "用本機 DNS-only VPN 切換解析服務；流量不會送往第三方 VPN 業者。", modifier) {
         dnsProviders.forEach { provider ->
-            DnsChoice(provider, selected == provider, dnsUpstream == provider.primary) { selected = provider }
+            DnsChoice(provider, selected.id == provider.id, dnsUpstream == provider.primary) { selectedId = provider.id }
             Spacer(Modifier.height(10.dp))
         }
         Spacer(Modifier.height(10.dp))

@@ -67,3 +67,7 @@ Bluetooth PAN and USB/RJ-45 Ethernet are recorded future transports but are not 
 ## ADR-016 — DNS service failures must reach the visible UI
 
 Starting a foreground service is asynchronous: a successful `startForegroundService` call does not prove that `VpnService.Builder.establish()` or the forwarding loop succeeded. The DNS service therefore owns failure detection and cleanup, publishes a transient user-facing error through `ServiceState`, and writes technical detail to the diagnostic console. The DNS screen consumes only the matching error value so an older UI callback cannot erase a newer failure. Normal stop closes the current descriptor first; a retired forwarding worker must not clear or stop a newer VPN session.
+
+## ADR-017 — Save stable identifiers across Android activity recreation
+
+Compose `rememberSaveable` state must contain Bundle-compatible values. The DNS screen stores only the selected provider ID and resolves the current provider from the maintained catalog; it does not attempt to save the custom `DnsProvider` object. This is required because opening Android's VPN consent activity can trigger state saving before the result returns. Consent results are also authoritative: cancellation records a diagnostic event and never starts the VPN service.
