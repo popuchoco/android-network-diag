@@ -71,3 +71,7 @@ Starting a foreground service is asynchronous: a successful `startForegroundServ
 ## ADR-017 — Save stable identifiers across Android activity recreation
 
 Compose `rememberSaveable` state must contain Bundle-compatible values. The DNS screen stores only the selected provider ID and resolves the current provider from the maintained catalog; it does not attempt to save the custom `DnsProvider` object. This is required because opening Android's VPN consent activity can trigger state saving before the result returns. Consent results are also authoritative: cancellation records a diagnostic event and never starts the VPN service.
+
+## ADR-018 — DNS probes require a currently resolvable target
+
+A DNS probe must not interpret NXDOMAIN for the chosen test name as failure of the device's resolver. On 2026-10-14, both Cloudflare and Google public resolvers returned NXDOMAIN for `www.hinet.net`, while the registrable `hinet.net` resolved normally. The diagnostic target was therefore changed to `hinet.net`. Endpoint validity must be rechecked when field evidence shows DNS failure alongside successful resolution and HTTPS access to unrelated hosts.

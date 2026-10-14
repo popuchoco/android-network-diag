@@ -53,8 +53,8 @@ class NetworkDiagnostics(private val context: Context) {
 
     private suspend fun dnsProbe() = withContext(Dispatchers.IO) {
         val start = System.nanoTime()
-        runCatching { InetAddress.getAllByName("www.hinet.net") }.fold(
-            { ProbeResult("DNS 解析", CheckState.Success, "www.hinet.net → ${it.first().hostAddress}", elapsed(start)) },
+        runCatching { InetAddress.getAllByName("hinet.net") }.fold(
+            { ProbeResult("DNS 解析", CheckState.Success, "hinet.net → ${it.first().hostAddress}", elapsed(start)) },
             { ProbeResult("DNS 解析", CheckState.Failed, it.localizedMessage ?: "解析失敗") },
         )
     }

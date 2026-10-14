@@ -18,6 +18,7 @@ This roadmap records accepted future directions from peer review and project res
 - Public-IP fallback with strict timeouts.
 - Explicit consecutive-failure counter in continuous monitoring.
 - DNS selection state stored as a Bundle-safe provider ID, with VPN consent cancellation handled without starting the service.
+- Android 17 field validation on 2026-10-14 confirmed that the DNS screen remained stable and the Google DNS-only VPN started successfully; see [DEVICE_TEST_RESULTS.md](DEVICE_TEST_RESULTS.md). Other matrix cases remain open.
 
 ## Near term — high priority
 

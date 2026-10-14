@@ -65,7 +65,7 @@
 | 用途 | 端點 |
 |---|---|
 | Android 外網驗證 | Google 與 Cloudflare 204 端點 |
-| DNS 測試 | `www.hinet.net` |
+| DNS 測試 | `hinet.net` |
 | 公開 IP | `api64.ipify.org`，失敗時才改用 `ifconfig.me/ip` |
 | Fastly 路線測試 | UI 中列出的 GitHub、X、Twitch 服務網域 |
 | 官方測速 | 僅在使用者點擊後開啟 `speed.hinet.net` |
