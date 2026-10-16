@@ -9,6 +9,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import tw.xiaoxin.networktool.model.CheckState
+import tw.xiaoxin.networktool.model.ConnectionPolicy
 import tw.xiaoxin.networktool.model.NetworkReport
 import tw.xiaoxin.networktool.model.ProbeResult
 import java.net.HttpURLConnection
@@ -18,7 +19,7 @@ import java.net.URL
 class NetworkDiagnostics(private val context: Context) {
     suspend fun run(): NetworkReport = coroutineScope {
         val connection = ConnectionExplainer(context).explain()
-        if (connection.airplaneMode) {
+        if (ConnectionPolicy.shouldSkipExternalChecks(connection.airplaneMode, connection.hasActiveNetwork)) {
             return@coroutineScope NetworkReport(
                 transport = connection.logicalTransport,
                 probes = listOf(ProbeResult("外部檢查", CheckState.Warning, connection.explanation)),

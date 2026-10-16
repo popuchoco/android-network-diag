@@ -6,6 +6,9 @@ data class ConnectionExplanation(
     val logicalTransport: String = "尚未檢查",
     val underlyingTransport: String? = null,
     val isOwnDnsVpn: Boolean = false,
+    val vpnInterface: String? = null,
+    val vpnAppCandidates: List<String> = emptyList(),
+    val hasActiveNetwork: Boolean = false,
     val localAddresses: List<String> = emptyList(),
     val gateway: String? = null,
     val hasPrivateAddress: Boolean = false,
@@ -16,6 +19,11 @@ data class ConnectionExplanation(
     val explanation: String = "尚未檢查連線來源",
     val airplaneMode: Boolean = false,
 )
+
+object ConnectionPolicy {
+    fun shouldSkipExternalChecks(airplaneMode: Boolean, hasActiveNetwork: Boolean) =
+        airplaneMode && !hasActiveNetwork
+}
 data class NetworkReport(
     val transport: String = "尚未檢查",
     val validated: Boolean = false,

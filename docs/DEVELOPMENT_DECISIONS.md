@@ -52,6 +52,8 @@ SIM and cellular diagnostics are accepted future features, but they must begin w
 
 Reporting only `TRANSPORT_VPN` hides whether the device actually depends on Wi-Fi or cellular service. The connection model now reports the logical path and best observable underlying non-VPN transport separately. This app's DNS-only VPN is labeled distinctly from an external VPN, but the UI does not claim a full/split-tunnel classification when Android does not provide enough evidence.
 
+An enabled airplane-mode setting is context, not proof of disconnection: Android permits Wi-Fi to be switched back on while airplane mode remains enabled. External probes are skipped only when there is no active network. For third-party VPN identification, the app reports the VPN interface and known installed clients (currently Tailscale and WireGuard) as candidates. It does not claim which candidate owns the active VPN because Android clears another app's VPN owner UID for privacy.
+
 ## ADR-013 — Local-network checks remain bounded
 
 Local IP, gateway, private-address classification, captive-portal state, and a bounded gateway reachability check are accepted. Broad LAN scanning, device discovery, or unrestricted port scanning are not. Android ICMP limitations mean gateway reachability should use a small, time-bounded method and must be presented as evidence rather than proof that the gateway is healthy.
@@ -75,3 +77,7 @@ Compose `rememberSaveable` state must contain Bundle-compatible values. The DNS 
 ## ADR-018 — DNS probes require a currently resolvable target
 
 A DNS probe must not interpret NXDOMAIN for the chosen test name as failure of the device's resolver. On 2026-10-14, both Cloudflare and Google public resolvers returned NXDOMAIN for `www.hinet.net`, while the registrable `hinet.net` resolved normally. The diagnostic target was therefore changed to `hinet.net`. Endpoint validity must be rechecked when field evidence shows DNS failure alongside successful resolution and HTTPS access to unrelated hosts.
+
+## ADR-019 — DNS VPN conflict is explicit
+
+Android permits only one active `VpnService`. The in-app DNS switch therefore cannot coexist with Tailscale, WireGuard, or another VPN app. The DNS screen detects an active external VPN before requesting consent, explains why the operation cannot be applied, and keeps system Private DNS as the alternative. Private DNS may still be overridden by a VPN provider's own DNS policy, so the app does not promise that changing it supersedes MagicDNS or another tunnel DNS configuration.

@@ -10,6 +10,7 @@ import android.os.IBinder
 import kotlinx.coroutines.*
 import tw.xiaoxin.networktool.MainActivity
 import tw.xiaoxin.networktool.model.CheckState
+import tw.xiaoxin.networktool.model.ConnectionPolicy
 import tw.xiaoxin.networktool.model.ServiceState
 import tw.xiaoxin.networktool.net.NetworkDiagnostics
 import tw.xiaoxin.networktool.log.DiagnosticLog
@@ -37,7 +38,8 @@ class NetworkMonitorService : Service() {
         val diagnostics = NetworkDiagnostics(this)
         while (currentCoroutineContext().isActive) {
             val report = diagnostics.run()
-            if (report.connection?.airplaneMode == true) {
+            val connection = report.connection
+            if (connection != null && ConnectionPolicy.shouldSkipExternalChecks(connection.airplaneMode, connection.hasActiveNetwork)) {
                 consecutiveFailures = 0
                 if (!airplaneModeLogged) DiagnosticLog.warning(this, "Monitor", "飛航模式中，已暫停外部檢查")
                 airplaneModeLogged = true

@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
@@ -118,7 +120,8 @@ private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boole
     val context = LocalContext.current
     Page("外網健檢", "不是只看 Wi‑Fi 圖示，而是實際確認裝置能否連到外部網路。", modifier) {
         report.connection?.takeIf { it.airplaneMode }?.let {
-            InfoCard(Icons.Outlined.AirplanemodeActive, "飛航模式已開啟", "已暫停外部探測，請關閉飛航模式後再檢查。")
+            val message = if (it.hasActiveNetwork) "Wi‑Fi 或 VPN 仍在連線，健檢會照常執行。" else "目前沒有活動網路，已暫停外部探測。"
+            InfoCard(Icons.Outlined.AirplanemodeActive, "飛航模式已開啟", message)
             Spacer(Modifier.height(16.dp))
         }
         Card(colors = CardDefaults.cardColors(containerColor = if (report.validated) Mint else Panel), shape = RoundedCornerShape(12.dp), border = CardDefaults.outlinedCardBorder()) {
@@ -175,6 +178,12 @@ private fun ConnectionCard(connection: ConnectionExplanation) {
                 else -> connection.logicalTransport
             }
             ConnectionDetail("傳輸", transport)
+            if (connection.logicalTransport == "VPN" && !connection.isOwnDnsVpn) {
+                connection.vpnAppCandidates.takeIf { it.isNotEmpty() }?.let {
+                    ConnectionDetail("VPN 候選", "${it.joinToString("、")}（Android 不公開目前擁有者，僅列已安裝客戶端）")
+                }
+                connection.vpnInterface?.let { ConnectionDetail("VPN 介面", it) }
+            }
             connection.localAddresses.firstOrNull()?.let { ConnectionDetail("本機 IP", it) }
             connection.gateway?.let { ConnectionDetail("閘道", it) }
             ConnectionDetail("網路驗證", when { connection.isCaptivePortal -> "需要登入入口網站"; connection.isValidated -> "已驗證"; connection.hasInternet -> "尚未驗證"; else -> "無網際網路能力" })
@@ -237,6 +246,11 @@ private fun DnsScreen(modifier: Modifier) {
         }
     }
     Page("DNS 切換", "用本機 DNS-only VPN 切換解析服務；流量不會送往第三方 VPN 業者。", modifier) {
+        val externalVpn = !active && isExternalVpnActive(context)
+        if (externalVpn) {
+            InfoCard(Icons.Outlined.VpnKey, "其他 VPN 正在使用中", "Android 只能同時執行一個 VPN。請先停止 Tailscale／WireGuard，或改用下方的系統 Private DNS。")
+            Spacer(Modifier.height(16.dp))
+        }
         dnsProviders.forEach { provider ->
             DnsChoice(provider, selected.id == provider.id, dnsUpstream == provider.primary) { selectedId = provider.id }
             Spacer(Modifier.height(10.dp))
@@ -244,6 +258,11 @@ private fun DnsScreen(modifier: Modifier) {
         Spacer(Modifier.height(10.dp))
         Button(onClick = {
             if (active) stopDns(context)
+            else if (isExternalVpnActive(context)) {
+                val message = "其他 VPN 正在使用中；Android 無法同時啟動 DNS-only VPN"
+                DiagnosticLog.warning(context, "DNS", message)
+                Toast.makeText(context, "$message。請先停止 Tailscale／WireGuard，或使用系統 Private DNS。", Toast.LENGTH_LONG).show()
+            }
             else {
                 val prepare = VpnService.prepare(context)
                 if (prepare != null) { pending = selected; vpnLauncher.launch(prepare) } else startDns(context, selected.primary)
@@ -259,7 +278,7 @@ private fun DnsScreen(modifier: Modifier) {
             Icon(Icons.Outlined.Settings, null); Spacer(Modifier.width(8.dp)); Text("改用系統 Private DNS")
         }
         Spacer(Modifier.height(12.dp))
-        Text("提示：Private DNS 使用主機名稱（已複製 ${selected.privateDnsHost}）；DNS-only VPN 會占用 Android 唯一的 VPN 插槽。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
+        Text("提示：Private DNS 使用主機名稱（已複製 ${selected.privateDnsHost}）；DNS-only VPN 會占用 Android 唯一的 VPN 插槽，不能與 Tailscale、WireGuard 等 VPN 同時啟用。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
     }
 }
 
@@ -363,3 +382,10 @@ private fun stopMonitor(context: Context) = context.startService(Intent(context,
 private fun openUrl(context: Context, url: String) = context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
 private fun copy(context: Context, text: String) = (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Private DNS", text))
 private fun formatTime(time: Long) = SimpleDateFormat("MM/dd HH:mm:ss", Locale.TAIWAN).format(Date(time))
+
+private fun isExternalVpnActive(context: Context): Boolean {
+    if (ServiceState.dnsUpstream.value != null) return false
+    val cm = context.getSystemService(ConnectivityManager::class.java)
+    return cm.activeNetwork?.let(cm::getNetworkCapabilities)
+        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+}

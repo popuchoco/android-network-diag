@@ -14,6 +14,8 @@ This roadmap records accepted future directions from peer review and project res
 - Unit tests included in GitHub CI.
 - Airplane-mode short-circuit for manual and continuous checks.
 - Logical VPN versus observable underlying transport, local IP/default gateway, validation/captive-portal state, and permission-free cellular availability.
+- Airplane mode with an active Wi-Fi/VPN path continues diagnostics; external VPNs expose their interface and conservatively list visible Tailscale/WireGuard candidates.
+- DNS-only VPN startup is blocked with an actionable explanation while another VPN owns Android's single VPN slot.
 - Notification-permission denial guidance.
 - Public-IP fallback with strict timeouts.
 - Explicit consecutive-failure counter in continuous monitoring.

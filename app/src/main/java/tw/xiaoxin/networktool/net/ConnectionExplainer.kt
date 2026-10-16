@@ -18,15 +18,8 @@ class ConnectionExplainer(private val context: Context) {
         val active = cm.activeNetwork
         val caps = active?.let(cm::getNetworkCapabilities)
         val airplaneMode = Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
-        if (airplaneMode) {
-            return ConnectionExplanation(
-                logicalTransport = "飛航模式",
-                explanation = "目前為飛航模式，已暫停外部網路檢查",
-                airplaneMode = true,
-            )
-        }
-
         val logical = transportName(caps)
+        val activeLink = active?.let(cm::getLinkProperties)
         val physical = if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true) {
             selectUnderlyingNetwork(cm, active)
         } else active
@@ -37,6 +30,7 @@ class ConnectionExplainer(private val context: Context) {
         val cellular = cellularSummary(cm)
         val underlying = if (physical != active) transportName(physicalCaps).takeUnless { it == "未連線" || it == "其他網路" } else null
         val ownDns = logical == "VPN" && ServiceState.dnsUpstream.value != null
+        val vpnCandidates = if (logical == "VPN" && !ownDns) installedVpnCandidates() else emptyList()
         val path = when {
             ownDns && underlying != null -> "DNS-only VPN（底層：$underlying）"
             logical == "VPN" && underlying != null -> "外部 VPN（底層：$underlying）"
@@ -44,6 +38,7 @@ class ConnectionExplainer(private val context: Context) {
         }
         val explanation = when {
             caps == null -> "目前沒有可用網路"
+            airplaneMode -> "飛航模式已開啟，$path 仍可使用；繼續執行健檢"
             logical == "Wi‑Fi" && cellular != "偵測到可用行動網路" -> "目前透過 Wi‑Fi 連線；$cellular"
             else -> "目前透過 $path 連線"
         }
@@ -51,6 +46,9 @@ class ConnectionExplainer(private val context: Context) {
             logicalTransport = logical,
             underlyingTransport = underlying,
             isOwnDnsVpn = ownDns,
+            vpnInterface = activeLink?.interfaceName.takeIf { logical == "VPN" },
+            vpnAppCandidates = vpnCandidates,
+            hasActiveNetwork = active != null,
             localAddresses = addresses,
             gateway = gateway,
             hasPrivateAddress = addresses.mapNotNull(::parseAddress).any(::isPrivateAddress),
@@ -59,7 +57,14 @@ class ConnectionExplainer(private val context: Context) {
             isCaptivePortal = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL) == true,
             cellularSummary = cellular,
             explanation = explanation,
+            airplaneMode = airplaneMode,
         )
+    }
+
+    private fun installedVpnCandidates(): List<String> = knownVpnPackages.mapNotNull { (packageName, label) ->
+        runCatching { context.packageManager.getApplicationInfo(packageName, 0) }
+            .getOrNull()
+            ?.let { label }
     }
 
     private fun selectUnderlyingNetwork(cm: ConnectivityManager, active: Network?): Network? =
@@ -108,5 +113,12 @@ class ConnectionExplainer(private val context: Context) {
         is Inet6Address -> address.isSiteLocalAddress || address.isLoopbackAddress || address.isLinkLocalAddress ||
             (address.address.first().toInt() and 0xFE) == 0xFC
         else -> false
+    }
+
+    private companion object {
+        val knownVpnPackages = listOf(
+            "com.tailscale.ipn" to "Tailscale",
+            "com.wireguard.android" to "WireGuard",
+        )
     }
 }
