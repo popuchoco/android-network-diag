@@ -2,6 +2,8 @@
 
 This roadmap records accepted future directions from peer review and project research. It is a planning document, not a promise that every item will ship. Priority can change after device testing, Android platform changes, or privacy review.
 
+The differentiating product direction is maintained in [PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md): evolve from a collection of network tools into a local-first change verifier that explains what changed and whether a corrective action worked.
+
 ## Completed foundations
 
 - Layered external HTTPS and DNS checks.
@@ -24,6 +26,20 @@ This roadmap records accepted future directions from peer review and project res
 - Android 17 field validation on 2026-10-14 confirmed that the DNS screen remained stable and the Google DNS-only VPN started successfully; see [DEVICE_TEST_RESULTS.md](DEVICE_TEST_RESULTS.md). Other matrix cases remain open.
 
 ## Near term — high priority
+
+### Change verification foundation
+
+- Define a versioned `DiagnosticSnapshot` containing network identity, transport, capabilities, VPN/tunnel context, DNS observations, public address family, routes, probes, and resolved service addresses.
+- Move durable evidence to Room and keep raw observations separate from derived explanations.
+- Build a Change Lab MVP: capture a baseline, apply or guide one explicit change, wait for network stabilization, rerun the same probes, and show only meaningful differences.
+- Verify DNS-only VPN activation with an actual resolver-path check; success means more than `VpnService.Builder.establish()` returning a descriptor.
+- Add a previewable, privacy-redacted Evidence Capsule v1 in text and versioned JSON.
+
+### Route-conflict explanations
+
+- Compare observable private routes, default routes, gateway, DNS, and validation state before and after a VPN/game accelerator/relay change.
+- Detect evidence patterns for external internet working while LAN/NAS access disappears, a tunnel taking the only VPN slot, and private-prefix route overlap.
+- Express conclusions as observation, inference, recommendation, and confidence; never present a hidden third-party policy as known fact.
 
 ### Explain the active connection
 
@@ -53,6 +69,7 @@ This roadmap records accepted future directions from peer review and project res
 - Add configurable monitoring interval, failure threshold, pause/resume, event annotations, metered-network policy, and optional reboot resumption.
 - Add a simple outage timeline, success rate, latency distribution, and jitter visualization after the Room schema stabilizes.
 - Consider WorkManager for explicitly opted-in periodic lightweight checks; it does not replace the user-visible foreground monitor for continuous observation.
+- Prefer an event-driven timeline using `NetworkCallback`; trigger bounded probes on meaningful state transitions instead of permanently polling when the network is stable.
 
 ### DNS evolution
 
@@ -60,6 +77,7 @@ This roadmap records accepted future directions from peer review and project res
 - Add TCP fallback for truncated/oversized DNS replies.
 - Evaluate DNS-over-HTTPS only with clear resolver disclosure and without silently expanding the VPN route.
 - Show the currently observed resolver/result comparison where Android APIs make this reliable.
+- Add a Resolver Truth Lab that compares system resolution with explicit resolvers on a selected `Network` before offering a configuration change.
 - Continue fuzz/edge-case testing of the hand-written packet layer; adopt a library only after license, size, maintenance, and packet-safety review.
 
 ### Route and interface diagnostics
@@ -68,9 +86,13 @@ This roadmap records accepted future directions from peer review and project res
 - Show resolved service IPs and whether an address belongs to a known Fastly range.
 - Validate Range responses by status and returned byte count.
 - Allow advanced users to select a specific available `Network` for a diagnostic run, then bind probes to that network.
+- Add Path A/B to compare the same low-volume probes over Wi-Fi and cellular without changing the device-wide default route; require explicit consent and a data estimate before activating cellular work.
 - Explore limited route/hop information only where Android permissions and reliability justify it.
 
 ## Later / high cost
+
+- Add IPv6-first/only, NAT64/DNS64, 464XLAT, CGNAT-indicator, and HTTP/3/QUIC fallback evidence to snapshots and explanations after device fixtures exist.
+- Add versioned service-diagnostic packs only when endpoints, expected responses, traffic limits, and maintenance ownership are documented.
 
 - Controlled speed tests require metered-network detection, explicit consent, persistent cooldown, size estimates, and provider backoff.
 - A root-only hosts module must be a separate opt-in capability with backup, validation, atomic apply, and rollback. It must not alter the normal non-root promise.

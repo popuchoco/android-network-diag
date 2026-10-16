@@ -85,3 +85,7 @@ Android permits only one active `VpnService`. The in-app DNS switch therefore ca
 ## ADR-020 — DNS provider cards apply immediately
 
 Choosing a DNS provider is the primary action, so provider cards are actionable controls rather than radio buttons followed by a separate Apply button. A tap selects and applies the provider. Android VPN consent appears only when required; once this app's DNS VPN is active, tapping another provider replaces the upstream without a manual stop. The destructive/reversing action remains a separate Stop button so status and intent are unambiguous.
+
+## ADR-021 — The product is a change verifier, not a tool grid
+
+The product's durable differentiation is evidence-backed before/after diagnosis. New protocol engines are accepted when they strengthen a user flow that captures a baseline, observes one explicit change, repeats comparable probes, and explains whether the result improved. Raw observations and derived inferences must remain separate, with confidence and evidence visible. The home experience should prioritize current state and the next useful action instead of accumulating independent utility buttons. The complete product thesis, staged epics, non-goals, and success metrics live in [PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md).

@@ -3,7 +3,7 @@
 [![Android CI](https://github.com/popuchoco/android-network-diag/actions/workflows/android.yml/badge.svg)](https://github.com/popuchoco/android-network-diag/actions/workflows/android.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-給台灣使用者的 Android 網路診斷工具。它不只看 Wi-Fi 圖示，而是透過 DNS、獨立 HTTPS 端點、Android 網路驗證狀態與公開 IP，確認裝置是否真的能連上外部網路。
+給台灣使用者的 Android 網路診斷與變更驗證工具。它不只看 Wi-Fi 圖示，而是透過 DNS、獨立 HTTPS 端點、Android 網路驗證狀態與公開 IP，確認裝置是否真的能連上外部網路。長期方向不是堆疊更多工具按鈕，而是回答「什麼變了、問題在哪一層、我剛做的調整有沒有用」。
 
 目前介面為繁體中文、僅提供深色模式，支援 Android 8.0 以上版本。
 
@@ -13,7 +13,7 @@
 
 - 同時測試 DNS、Android 使用的 Google 204 與獨立的 Cloudflare 204 端點。
 - 顯示 Android `VALIDATED`／captive portal 狀態與公開 IP。
-- 飛航模式開啟時停止外部探測，直接顯示原因。
+- 飛航模式開啟且沒有活動網路時停止外部探測；若 Wi-Fi 或 VPN 仍可用則照常健檢。
 - 說明目前的連線來源：
   - Wi-Fi、行動網路、乙太網路或 VPN
   - VPN 底層可觀察到的 Wi-Fi／行動網路
@@ -112,6 +112,7 @@ app/src/main/java/tw/xiaoxin/networktool/
 
 ## 文件
 
+- [產品策略／差異化藍圖](docs/PRODUCT_STRATEGY.md)
 - [架構說明](docs/ARCHITECTURE.md)
 - [系統設計](docs/SYSTEM_DESIGN.md)
 - [開發決策／ADR](docs/DEVELOPMENT_DECISIONS.md)
