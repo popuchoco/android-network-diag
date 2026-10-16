@@ -81,3 +81,7 @@ A DNS probe must not interpret NXDOMAIN for the chosen test name as failure of t
 ## ADR-019 — DNS VPN conflict is explicit
 
 Android permits only one active `VpnService`. The in-app DNS switch therefore cannot coexist with Tailscale, WireGuard, a consumer VPN, or a game accelerator/relay implemented with `VpnService`. The DNS screen detects an active external tunnel before requesting consent, explains why the operation cannot be applied, and keeps system Private DNS as the alternative. Private DNS may still be overridden by the tunnel provider's own DNS policy, so the app does not promise that changing it supersedes MagicDNS or another tunnel DNS configuration.
+
+## ADR-020 — DNS provider cards apply immediately
+
+Choosing a DNS provider is the primary action, so provider cards are actionable controls rather than radio buttons followed by a separate Apply button. A tap selects and applies the provider. Android VPN consent appears only when required; once this app's DNS VPN is active, tapping another provider replaces the upstream without a manual stop. The destructive/reversing action remains a separate Stop button so status and intent are unambiguous.

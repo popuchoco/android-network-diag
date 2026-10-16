@@ -245,6 +245,29 @@ private fun DnsScreen(modifier: Modifier) {
             ServiceState.consumeDnsError(it)
         }
     }
+    val applyProvider: (DnsProvider) -> Unit = { provider ->
+        selectedId = provider.id
+        when {
+            dnsUpstream == provider.primary -> {
+                Toast.makeText(context, "目前已使用 ${provider.name}", Toast.LENGTH_SHORT).show()
+            }
+            active -> startDns(context, provider.primary)
+            isExternalVpnActive(context) -> {
+                val message = "其他 VPN、加速器或跳板正在使用中；Android 無法同時啟動 DNS-only VPN"
+                DiagnosticLog.warning(context, "DNS", message)
+                Toast.makeText(context, "$message。請先停止該網路隧道，或使用系統 Private DNS。", Toast.LENGTH_LONG).show()
+            }
+            else -> {
+                val prepare = VpnService.prepare(context)
+                if (prepare != null) {
+                    pending = provider
+                    vpnLauncher.launch(prepare)
+                } else {
+                    startDns(context, provider.primary)
+                }
+            }
+        }
+    }
     Page("DNS 切換", "用本機 DNS-only VPN 切換解析服務；流量不會送往第三方 VPN 業者。", modifier) {
         val externalVpn = !active && isExternalVpnActive(context)
         if (externalVpn) {
@@ -252,23 +275,15 @@ private fun DnsScreen(modifier: Modifier) {
             Spacer(Modifier.height(16.dp))
         }
         dnsProviders.forEach { provider ->
-            DnsChoice(provider, selected.id == provider.id, dnsUpstream == provider.primary) { selectedId = provider.id }
+            DnsChoice(provider, selected.id == provider.id, dnsUpstream == provider.primary) { applyProvider(provider) }
             Spacer(Modifier.height(10.dp))
         }
-        Spacer(Modifier.height(10.dp))
-        Button(onClick = {
-            if (active) stopDns(context)
-            else if (isExternalVpnActive(context)) {
-                val message = "其他 VPN、加速器或跳板正在使用中；Android 無法同時啟動 DNS-only VPN"
-                DiagnosticLog.warning(context, "DNS", message)
-                Toast.makeText(context, "$message。請先停止該網路隧道，或使用系統 Private DNS。", Toast.LENGTH_LONG).show()
+        Text("點選任一服務即可立即套用；切換到另一家不必先停止。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
+        if (active) {
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = { stopDns(context) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(14.dp)) {
+                Icon(Icons.Outlined.Stop, null); Spacer(Modifier.width(8.dp)); Text("停止 DNS 切換")
             }
-            else {
-                val prepare = VpnService.prepare(context)
-                if (prepare != null) { pending = selected; vpnLauncher.launch(prepare) } else startDns(context, selected.primary)
-            }
-        }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(16.dp), colors = ButtonDefaults.buttonColors(containerColor = if (active) Ink else Moss)) {
-            Icon(if (active) Icons.Outlined.Stop else Icons.Outlined.Shield, null); Spacer(Modifier.width(8.dp)); Text(if (active) "停止 DNS 切換" else "套用 ${selected.name}")
         }
         Spacer(Modifier.height(12.dp))
         OutlinedButton(onClick = {
@@ -346,7 +361,11 @@ private fun DnsChoice(provider: DnsProvider, selected: Boolean, active: Boolean,
         Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
             RadioButton(selected, onClick = onClick)
             Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) { Text(provider.name, fontWeight = FontWeight.SemiBold); Text("${provider.primary}  ·  ${provider.secondary}", color = Ink.copy(alpha = .72f), fontSize = 14.sp, fontFamily = FontFamily.Monospace) }
+            Column(Modifier.weight(1f)) {
+                Text(provider.name, fontWeight = FontWeight.SemiBold)
+                Text("${provider.primary}  ·  ${provider.secondary}", color = Ink.copy(alpha = .72f), fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+                if (selected && !active) Text("點一下立即套用", color = Ink.copy(alpha = .6f), fontSize = 12.sp)
+            }
             if (active) AssistChip(onClick = {}, label = { Text("使用中") }, leadingIcon = { Icon(Icons.Outlined.Check, null, Modifier.size(16.dp)) })
         }
     }
