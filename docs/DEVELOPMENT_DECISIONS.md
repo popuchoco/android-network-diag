@@ -52,7 +52,7 @@ SIM and cellular diagnostics are accepted future features, but they must begin w
 
 Reporting only `TRANSPORT_VPN` hides whether the device actually depends on Wi-Fi or cellular service. The connection model now reports the logical path and best observable underlying non-VPN transport separately. This app's DNS-only VPN is labeled distinctly from an external VPN, but the UI does not claim a full/split-tunnel classification when Android does not provide enough evidence.
 
-An enabled airplane-mode setting is context, not proof of disconnection: Android permits Wi-Fi to be switched back on while airplane mode remains enabled. External probes are skipped only when there is no active network. For third-party VPN identification, the app reports the VPN interface and known installed clients (currently Tailscale and WireGuard) as candidates. It does not claim which candidate owns the active VPN because Android clears another app's VPN owner UID for privacy.
+An enabled airplane-mode setting is context, not proof of disconnection: Android permits Wi-Fi to be switched back on while airplane mode remains enabled. External probes are skipped only when there is no active network. Android's VPN transport also covers products marketed as game accelerators, per-app route optimizers, and relays. The app therefore uses the neutral `VPN／加速器／跳板` label, reports the interface, and lists known installed clients (currently Tailscale and WireGuard) only as candidates. It does not claim which candidate owns the active tunnel because Android clears another app's VPN owner UID for privacy. App-private HTTP/SOCKS relays that do not register a system VPN or proxy are outside what another ordinary app can reliably observe.
 
 ## ADR-013 — Local-network checks remain bounded
 
@@ -80,4 +80,4 @@ A DNS probe must not interpret NXDOMAIN for the chosen test name as failure of t
 
 ## ADR-019 — DNS VPN conflict is explicit
 
-Android permits only one active `VpnService`. The in-app DNS switch therefore cannot coexist with Tailscale, WireGuard, or another VPN app. The DNS screen detects an active external VPN before requesting consent, explains why the operation cannot be applied, and keeps system Private DNS as the alternative. Private DNS may still be overridden by a VPN provider's own DNS policy, so the app does not promise that changing it supersedes MagicDNS or another tunnel DNS configuration.
+Android permits only one active `VpnService`. The in-app DNS switch therefore cannot coexist with Tailscale, WireGuard, a consumer VPN, or a game accelerator/relay implemented with `VpnService`. The DNS screen detects an active external tunnel before requesting consent, explains why the operation cannot be applied, and keeps system Private DNS as the alternative. Private DNS may still be overridden by the tunnel provider's own DNS policy, so the app does not promise that changing it supersedes MagicDNS or another tunnel DNS configuration.

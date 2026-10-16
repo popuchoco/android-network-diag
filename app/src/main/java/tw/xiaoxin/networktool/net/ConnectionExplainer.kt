@@ -33,7 +33,7 @@ class ConnectionExplainer(private val context: Context) {
         val vpnCandidates = if (logical == "VPN" && !ownDns) installedVpnCandidates() else emptyList()
         val path = when {
             ownDns && underlying != null -> "DNS-only VPN（底層：$underlying）"
-            logical == "VPN" && underlying != null -> "外部 VPN（底層：$underlying）"
+            logical == "VPN" && underlying != null -> "VPN／加速器／跳板（底層：$underlying）"
             else -> logical
         }
         val explanation = when {

@@ -174,13 +174,13 @@ private fun ConnectionCard(connection: ConnectionExplanation) {
             Spacer(Modifier.height(12.dp))
             val transport = when {
                 connection.isOwnDnsVpn && connection.underlyingTransport != null -> "DNS-only VPN（底層：${connection.underlyingTransport}）"
-                connection.logicalTransport == "VPN" && connection.underlyingTransport != null -> "外部 VPN（底層：${connection.underlyingTransport}）"
+                connection.logicalTransport == "VPN" && connection.underlyingTransport != null -> "VPN／加速器／跳板（底層：${connection.underlyingTransport}）"
                 else -> connection.logicalTransport
             }
             ConnectionDetail("傳輸", transport)
             if (connection.logicalTransport == "VPN" && !connection.isOwnDnsVpn) {
                 connection.vpnAppCandidates.takeIf { it.isNotEmpty() }?.let {
-                    ConnectionDetail("VPN 候選", "${it.joinToString("、")}（Android 不公開目前擁有者，僅列已安裝客戶端）")
+                    ConnectionDetail("隧道候選", "${it.joinToString("、")}（Android 不公開目前擁有者，僅列已安裝客戶端）")
                 }
                 connection.vpnInterface?.let { ConnectionDetail("VPN 介面", it) }
             }
@@ -248,7 +248,7 @@ private fun DnsScreen(modifier: Modifier) {
     Page("DNS 切換", "用本機 DNS-only VPN 切換解析服務；流量不會送往第三方 VPN 業者。", modifier) {
         val externalVpn = !active && isExternalVpnActive(context)
         if (externalVpn) {
-            InfoCard(Icons.Outlined.VpnKey, "其他 VPN 正在使用中", "Android 只能同時執行一個 VPN。請先停止 Tailscale／WireGuard，或改用下方的系統 Private DNS。")
+            InfoCard(Icons.Outlined.VpnKey, "其他網路隧道正在使用中", "VPN、遊戲加速器或跳板可能占用 Android 唯一的 VPN 插槽。請先停止該服務，或改用下方的系統 Private DNS。")
             Spacer(Modifier.height(16.dp))
         }
         dnsProviders.forEach { provider ->
@@ -259,9 +259,9 @@ private fun DnsScreen(modifier: Modifier) {
         Button(onClick = {
             if (active) stopDns(context)
             else if (isExternalVpnActive(context)) {
-                val message = "其他 VPN 正在使用中；Android 無法同時啟動 DNS-only VPN"
+                val message = "其他 VPN、加速器或跳板正在使用中；Android 無法同時啟動 DNS-only VPN"
                 DiagnosticLog.warning(context, "DNS", message)
-                Toast.makeText(context, "$message。請先停止 Tailscale／WireGuard，或使用系統 Private DNS。", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "$message。請先停止該網路隧道，或使用系統 Private DNS。", Toast.LENGTH_LONG).show()
             }
             else {
                 val prepare = VpnService.prepare(context)
@@ -278,7 +278,7 @@ private fun DnsScreen(modifier: Modifier) {
             Icon(Icons.Outlined.Settings, null); Spacer(Modifier.width(8.dp)); Text("改用系統 Private DNS")
         }
         Spacer(Modifier.height(12.dp))
-        Text("提示：Private DNS 使用主機名稱（已複製 ${selected.privateDnsHost}）；DNS-only VPN 會占用 Android 唯一的 VPN 插槽，不能與 Tailscale、WireGuard 等 VPN 同時啟用。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
+        Text("提示：Private DNS 使用主機名稱（已複製 ${selected.privateDnsHost}）；DNS-only VPN 會占用 Android 唯一的 VPN 插槽，不能與 VPN、遊戲加速器或跳板服務同時啟用。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
     }
 }
 
