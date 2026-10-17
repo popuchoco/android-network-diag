@@ -92,4 +92,12 @@ The product's durable differentiation is evidence-backed before/after diagnosis.
 
 ## ADR-022 — Snapshots are versioned evidence with privacy-first export
 
-Change Lab stores raw diagnostic snapshots in an app-private Room database and retains at most 100 records. A separately testable comparator derives changes; it does not rewrite the evidence. Evidence Capsule JSON carries a schema version, defaults to redacting public/local IP and gateway data, and requires preview plus explicit opt-in before including addresses. Export uses the system document picker and never implies upload. The first implementation compares manual baselines; route capture, stabilization waiting, annotations, and readable text capsules remain follow-up work.
+Change Lab stores raw diagnostic snapshots in an app-private Room database and retains at most 100 records. A separately testable comparator derives changes; it does not rewrite the evidence. Evidence Capsule JSON carries a schema version, defaults to redacting public/local IP and gateway data, and requires preview plus explicit opt-in before including addresses. Export uses the system document picker and never implies upload. Route capture remains follow-up work; bounded stabilization waiting, annotations, and readable text capsules shipped with schema version 2.
+
+## ADR-023 — Change Lab waits for observable stability, not guaranteed health
+
+Before a baseline or retest, Change Lab samples Android's active network signature until it repeats or a four-second deadline expires. This reduces measurements taken halfway through a Wi-Fi or VPN transition without pretending that Android can prove the route is fully converged. The elapsed wait is stored as evidence. Optional user annotations are limited to 120 characters and remain in the private Room database unless explicitly exported. Evidence Capsule now offers readable text as well as machine-readable JSON; both retain address redaction by default.
+
+## ADR-024 — Phase 3 begins with resolver truth
+
+Resolver Truth Lab precedes Path A/B. Both need a reusable selected-`Network` execution layer, bounded probes, comparable result schemas, explicit VPN degradation, and address-family evidence. Cellular Path A/B additionally requires consent, a data estimate, metered-network handling, and a device matrix, so it must not be used as the first experiment for that infrastructure. The staged delivery and stop conditions are maintained in [PHASE3_PLAN.md](PHASE3_PLAN.md).

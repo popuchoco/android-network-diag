@@ -1,6 +1,7 @@
 package tw.xiaoxin.networktool.snapshot
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -18,6 +19,18 @@ class SnapshotComparatorTest {
     @Test fun ignoresEquivalentSnapshots() {
         val value = snapshot(listOf(SnapshotProbe("DNS", "Success", "ok", 20)))
         assertTrue(SnapshotComparator.compare(value, value).changes.isEmpty())
+    }
+
+    @Test fun readableEvidenceKeepsAnnotationAndRedactsAddressesByDefault() {
+        val before = snapshot(listOf(SnapshotProbe("DNS", "Success", "resolved 192.168.1.53", 20)))
+            .copy(label = "變更前", annotation = "尚未開啟 VPN")
+        val after = before.copy(label = "變更後", annotation = "開啟 Tailscale", publicIp = "198.51.100.2")
+
+        val text = SnapshotCodec.evidenceText(SnapshotComparator.compare(before, after), includeAddresses = false)
+
+        assertTrue(text.contains("開啟 Tailscale"))
+        assertTrue(text.contains("[已隱藏]"))
+        assertFalse(text.contains("198.51.100.2"))
     }
 
     private fun snapshot(probes: List<SnapshotProbe>) = DiagnosticSnapshot(

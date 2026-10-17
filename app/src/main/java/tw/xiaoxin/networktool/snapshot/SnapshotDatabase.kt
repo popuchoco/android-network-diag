@@ -3,6 +3,8 @@ package tw.xiaoxin.networktool.snapshot
 import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
+import androidx.room.AutoMigration
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Insert
 import androidx.room.PrimaryKey
@@ -25,6 +27,8 @@ data class SnapshotEntity(
     val localAddresses: String,
     val gateway: String?,
     val dnsUpstream: String?,
+    val annotation: String? = null,
+    @ColumnInfo(defaultValue = "0") val stabilizationMs: Long = 0,
     val probesJson: String,
     val fastlyJson: String,
 )
@@ -40,7 +44,12 @@ interface SnapshotDao {
     suspend fun trim(keep: Int = 100)
 }
 
-@Database(entities = [SnapshotEntity::class], version = 1, exportSchema = true)
+@Database(
+    entities = [SnapshotEntity::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+)
 abstract class SnapshotDatabase : RoomDatabase() {
     abstract fun snapshots(): SnapshotDao
 

@@ -11,6 +11,7 @@ import tw.xiaoxin.networktool.model.ProbeResult
 import tw.xiaoxin.networktool.log.DiagnosticLog
 import tw.xiaoxin.networktool.net.FastlyDiagnostics
 import tw.xiaoxin.networktool.net.NetworkDiagnostics
+import tw.xiaoxin.networktool.net.NetworkStabilizer
 import tw.xiaoxin.networktool.model.ServiceState
 import tw.xiaoxin.networktool.snapshot.DiagnosticSnapshot
 import tw.xiaoxin.networktool.snapshot.SnapshotCodec
@@ -22,6 +23,7 @@ import tw.xiaoxin.networktool.snapshot.SnapshotFactory
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
     private val diagnostics = NetworkDiagnostics(application)
+    private val stabilizer = NetworkStabilizer(application)
     private val _report = MutableStateFlow(NetworkReport())
     val report = _report.asStateFlow()
     private val _checking = MutableStateFlow(false)
@@ -70,11 +72,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun captureBaseline() = viewModelScope.launch {
+    fun captureBaseline(annotation: String = "") = viewModelScope.launch {
         _changeLabRunning.value = true
         DiagnosticLog.info(app, "ChangeLab", "開始建立變更前基準")
         try {
-            val snapshot = collectSnapshot("變更前")
+            val snapshot = collectSnapshot("變更前", annotation)
             _baseline.value = save(snapshot)
             _comparison.value = null
             DiagnosticLog.info(app, "ChangeLab", "已建立基準：${snapshot.transport}，${snapshot.probes.count { it.state == "Success" }}/${snapshot.probes.size} 項通過")
@@ -83,12 +85,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun compareWithBaseline() = viewModelScope.launch {
+    fun compareWithBaseline(annotation: String = "") = viewModelScope.launch {
         val before = _baseline.value ?: return@launch
         _changeLabRunning.value = true
         DiagnosticLog.info(app, "ChangeLab", "開始重測並比較變更")
         try {
-            val after = save(collectSnapshot("變更後"))
+            val after = save(collectSnapshot("變更後", annotation))
             _comparison.value = SnapshotComparator.compare(before, after)
             DiagnosticLog.info(app, "ChangeLab", _comparison.value!!.summary)
         } finally {
@@ -99,12 +101,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun evidenceJson(includeAddresses: Boolean): String? =
         _comparison.value?.let { SnapshotCodec.evidenceJson(it, includeAddresses) }
 
-    private suspend fun collectSnapshot(label: String): DiagnosticSnapshot {
+    fun evidenceText(includeAddresses: Boolean): String? =
+        _comparison.value?.let { SnapshotCodec.evidenceText(it, includeAddresses) }
+
+    private suspend fun collectSnapshot(label: String, annotation: String): DiagnosticSnapshot {
+        DiagnosticLog.info(app, "ChangeLab", "等待網路狀態穩定")
+        val stabilizationMs = stabilizer.awaitStable()
         val result = diagnostics.run()
         val fastlyResult = FastlyDiagnostics.run()
         _report.value = result
         _fastly.value = fastlyResult
-        return SnapshotFactory.create(label, result, fastlyResult, ServiceState.dnsUpstream.value)
+        return SnapshotFactory.create(
+            label = label,
+            report = result,
+            fastly = fastlyResult,
+            dnsUpstream = ServiceState.dnsUpstream.value,
+            annotation = annotation,
+            stabilizationMs = stabilizationMs,
+        )
     }
 
     private suspend fun save(snapshot: DiagnosticSnapshot): DiagnosticSnapshot {

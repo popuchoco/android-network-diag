@@ -15,7 +15,7 @@ data class SnapshotProbe(
 
 data class DiagnosticSnapshot(
     val id: Long = 0,
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
     val capturedAt: Long,
     val label: String,
     val transport: String,
@@ -27,6 +27,8 @@ data class DiagnosticSnapshot(
     val localAddresses: List<String>,
     val gateway: String?,
     val dnsUpstream: String?,
+    val annotation: String? = null,
+    val stabilizationMs: Long = 0,
     val probes: List<SnapshotProbe>,
     val fastly: List<SnapshotProbe>,
 )
@@ -41,7 +43,14 @@ data class SnapshotComparison(
 )
 
 object SnapshotFactory {
-    fun create(label: String, report: NetworkReport, fastly: List<ProbeResult>, dnsUpstream: String?): DiagnosticSnapshot {
+    fun create(
+        label: String,
+        report: NetworkReport,
+        fastly: List<ProbeResult>,
+        dnsUpstream: String?,
+        annotation: String? = null,
+        stabilizationMs: Long = 0,
+    ): DiagnosticSnapshot {
         val connection = report.connection
         return DiagnosticSnapshot(
             capturedAt = report.checkedAt ?: System.currentTimeMillis(),
@@ -55,6 +64,8 @@ object SnapshotFactory {
             localAddresses = connection?.localAddresses.orEmpty(),
             gateway = connection?.gateway,
             dnsUpstream = dnsUpstream,
+            annotation = annotation?.trim()?.takeIf(String::isNotEmpty),
+            stabilizationMs = stabilizationMs,
             probes = report.probes.map(::probe),
             fastly = fastly.map(::probe),
         )
@@ -116,6 +127,8 @@ object SnapshotCodec {
         localAddresses = JSONArray(value.localAddresses).toString(),
         gateway = value.gateway,
         dnsUpstream = value.dnsUpstream,
+        annotation = value.annotation,
+        stabilizationMs = value.stabilizationMs,
         probesJson = probesToJson(value.probes).toString(),
         fastlyJson = probesToJson(value.fastly).toString(),
     )
@@ -134,12 +147,14 @@ object SnapshotCodec {
         localAddresses = jsonStrings(JSONArray(value.localAddresses)),
         gateway = value.gateway,
         dnsUpstream = value.dnsUpstream,
+        annotation = value.annotation,
+        stabilizationMs = value.stabilizationMs,
         probes = probesFromJson(JSONArray(value.probesJson)),
         fastly = probesFromJson(JSONArray(value.fastlyJson)),
     )
 
     fun evidenceJson(comparison: SnapshotComparison, includeAddresses: Boolean): String = JSONObject().apply {
-        put("schemaVersion", 1)
+        put("schemaVersion", 2)
         put("generatedAt", System.currentTimeMillis())
         put("privacy", JSONObject().put("addressesIncluded", includeAddresses))
         put("summary", comparison.summary)
@@ -155,6 +170,7 @@ object SnapshotCodec {
         put("capturedAt", value.capturedAt); put("label", value.label); put("transport", value.transport)
         put("underlyingTransport", value.underlyingTransport); put("publicIp", if (includeAddresses) value.publicIp else "[redacted]")
         put("validated", value.validated); put("airplaneMode", value.airplaneMode); put("externalTunnel", value.externalTunnel)
+        put("annotation", value.annotation ?: JSONObject.NULL); put("stabilizationMs", value.stabilizationMs)
         put("localAddresses", if (includeAddresses) JSONArray(value.localAddresses) else JSONArray())
         put("gateway", if (includeAddresses) value.gateway else JSONObject.NULL); put("dnsUpstream", value.dnsUpstream)
         put("probes", probesToJson(value.probes, includeAddresses)); put("fastly", probesToJson(value.fastly, includeAddresses))
@@ -175,4 +191,30 @@ object SnapshotCodec {
     private fun redact(value: String, includeAddresses: Boolean) = if (includeAddresses) value else
         value.replace(Regex("(?<![A-Fa-f0-9:])(?:\\d{1,3}\\.){3}\\d{1,3}(?![A-Fa-f0-9:])"), "[redacted-ipv4]")
             .replace(Regex("(?i)(?:[0-9a-f]{0,4}:){2,}[0-9a-f]{0,4}"), "[redacted-ipv6]")
+
+    fun evidenceText(comparison: SnapshotComparison, includeAddresses: Boolean): String = buildString {
+        appendLine("Android Network Diag - Change Lab")
+        appendLine("產生時間：${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}")
+        appendLine("摘要：${comparison.summary}")
+        appendLine()
+        appendSnapshot("變更前", comparison.before, includeAddresses)
+        appendLine()
+        appendSnapshot("變更後", comparison.after, includeAddresses)
+        appendLine()
+        appendLine("觀察到的差異")
+        if (comparison.changes.isEmpty()) appendLine("- 沒有觀察到可辨識的差異")
+        comparison.changes.forEach { appendLine("- ${it.title}：${redact(it.before, includeAddresses)} → ${redact(it.after, includeAddresses)}") }
+    }
+
+    private fun StringBuilder.appendSnapshot(title: String, value: DiagnosticSnapshot, includeAddresses: Boolean) {
+        appendLine(title)
+        appendLine("- 時間：${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(value.capturedAt))}")
+        value.annotation?.let { appendLine("- 註記：$it") }
+        appendLine("- 路徑：${value.transport}${value.underlyingTransport?.let { " / $it" }.orEmpty()}")
+        appendLine("- 公開 IP：${if (includeAddresses) value.publicIp else "[已隱藏]"}")
+        appendLine("- DNS：${value.dnsUpstream ?: "系統設定"}")
+        appendLine("- Android 驗證：${if (value.validated) "通過" else "未通過"}")
+        appendLine("- 穩定等待：${value.stabilizationMs} ms")
+        appendLine("- 外網檢查：${value.probes.count { it.state == CheckState.Success.name }}/${value.probes.size} 通過")
+    }
 }

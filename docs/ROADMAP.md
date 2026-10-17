@@ -32,8 +32,8 @@ The differentiating product direction is maintained in [PRODUCT_STRATEGY.md](PRO
 ### Change verification foundation
 
 - Expand the initial snapshot schema with observable routes, DNS server properties, address-family classification, and resolved-service fields.
-- Add network-stabilization waiting and user annotations to the shipped manual Change Lab baseline/retest flow.
-- Add readable text output alongside the shipped versioned JSON Evidence Capsule.
+- [x] Add bounded network-stabilization waiting and user annotations to the shipped manual Change Lab baseline/retest flow.
+- [x] Add readable text output alongside the shipped versioned JSON Evidence Capsule.
 
 ### Route-conflict explanations
 
@@ -117,3 +117,7 @@ Every roadmap feature should define:
 4. Data destinations and privacy disclosure.
 5. Unit or instrumentation coverage and a CI path.
 6. Interaction with external VPNs and the DNS-only VPN slot.
+
+## Phase 3 execution
+
+Phase 3 is now arranged as an evidence-first sequence rather than three independent tools. See [PHASE3_PLAN.md](PHASE3_PLAN.md) for work packages, acceptance criteria, privacy limits, and dependencies. Resolver Truth Lab starts first because its network-binding and result model are prerequisites for safe Path A/B comparison.

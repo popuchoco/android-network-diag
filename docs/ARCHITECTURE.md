@@ -24,8 +24,9 @@ The MVP uses one Android application module and keeps protocol engines separate 
 - `DnsVpnService`: captures only traffic addressed to the VPN-provided DNS IP, forwards UDP DNS to the selected resolver on a protected socket, and constructs the reply packet locally. Establishment and forwarding failures are published through `ServiceState`, allowing the visible DNS screen to show an actionable error even though the failure occurs asynchronously inside the service.
 - The DNS provider cards are direct actions rather than a two-step selection form. The first tap may require Android VPN consent; later taps replace the upstream in place, while stopping DNS remains a separate secondary action.
 - Compose screens: presentation and user consent entry points only; network work stays off the main thread.
-- `DiagnosticSnapshot`: versioned raw observations from the health and Fastly engines. `SnapshotComparator` derives before/after changes without mutating observations. Room retains the newest 100 snapshots and restores only records explicitly labeled as baselines.
-- `SnapshotCodec`: maps Room entities and creates a versioned Evidence Capsule. Address fields are redacted by default and included only after the user opts in from the export preview.
+- `NetworkStabilizer`: samples the active network, transports, validation, and captive-portal capabilities until the observable signature repeats or a four-second bound expires. Change Lab records the actual wait duration and then runs comparable probes; it never waits indefinitely for a network to become healthy.
+- `DiagnosticSnapshot`: versioned raw observations from the health and Fastly engines, including an optional local annotation and stabilization duration. `SnapshotComparator` derives before/after changes without mutating observations. Room retains the newest 100 snapshots and restores only records explicitly labeled as baselines.
+- `SnapshotCodec`: maps Room entities and creates versioned JSON and readable-text Evidence Capsules. Address fields are redacted by default and included only after the user opts in from the export preview.
 
 ## Data and privacy
 

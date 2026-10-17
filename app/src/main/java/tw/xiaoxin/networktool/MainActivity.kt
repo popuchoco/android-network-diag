@@ -133,6 +133,15 @@ private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boole
                 .onFailure { DiagnosticLog.error(context, "Evidence", "匯出失敗：${it.message ?: it.javaClass.simpleName}") }
         }
     }
+    val evidenceTextExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        val content = pendingEvidence
+        pendingEvidence = null
+        if (uri != null && content != null) {
+            runCatching { context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(content) } }
+                .onSuccess { DiagnosticLog.info(context, "Evidence", "可讀診斷報告已匯出") }
+                .onFailure { DiagnosticLog.error(context, "Evidence", "匯出失敗：${it.message ?: it.javaClass.simpleName}") }
+        }
+    }
     if (showEvidencePreview) {
         val preview = vm.evidenceJson(includeAddresses).orEmpty()
         AlertDialog(
@@ -150,11 +159,18 @@ private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boole
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    pendingEvidence = vm.evidenceJson(includeAddresses)
-                    showEvidencePreview = false
-                    evidenceExporter.launch("network-evidence-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.json")
-                }) { Text("匯出 JSON") }
+                Row {
+                    TextButton(onClick = {
+                        pendingEvidence = vm.evidenceText(includeAddresses)
+                        showEvidencePreview = false
+                        evidenceTextExporter.launch("network-evidence-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.txt")
+                    }) { Text("匯出文字") }
+                    TextButton(onClick = {
+                        pendingEvidence = vm.evidenceJson(includeAddresses)
+                        showEvidencePreview = false
+                        evidenceExporter.launch("network-evidence-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.json")
+                    }) { Text("匯出 JSON") }
+                }
             },
             dismissButton = { TextButton(onClick = { showEvidencePreview = false }) { Text("取消") } },
         )
@@ -219,10 +235,11 @@ private fun ChangeLabCard(
     baselineTime: Long?,
     comparison: tw.xiaoxin.networktool.snapshot.SnapshotComparison?,
     running: Boolean,
-    onCapture: () -> Unit,
-    onCompare: () -> Unit,
+    onCapture: (String) -> Unit,
+    onCompare: (String) -> Unit,
     onExport: () -> Unit,
 ) {
+    var annotation by rememberSaveable(baselineTime) { mutableStateOf("") }
     Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(12.dp), border = CardDefaults.outlinedCardBorder()) {
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -250,8 +267,21 @@ private fun ChangeLabCard(
                     }
                 }
             }
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = annotation,
+                onValueChange = { annotation = it.take(120) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(if (baselineTime == null) "原始狀態（選填）" else "剛做了什麼變更（選填）") },
+                placeholder = { Text(if (baselineTime == null) "例如：家中 Wi-Fi，尚未開 VPN" else "例如：開啟 Tailscale 後 NAS 無法連線") },
+                minLines = 1,
+                maxLines = 2,
+                supportingText = { Text("${annotation.length}/120；只保存在裝置與匯出報告") },
+            )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = if (baselineTime == null) onCapture else onCompare, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp)) {
+            Button(onClick = {
+                if (baselineTime == null) onCapture(annotation) else onCompare(annotation)
+            }, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp)) {
                 if (running) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Canvas)
                 else Icon(if (baselineTime == null) Icons.Outlined.BookmarkAdd else Icons.Outlined.Refresh, null)
                 Spacer(Modifier.width(8.dp))
@@ -259,7 +289,7 @@ private fun ChangeLabCard(
             }
             if (baselineTime != null) {
                 Spacer(Modifier.height(8.dp))
-                TextButton(onClick = onCapture, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("改用目前狀態建立新基準") }
+                TextButton(onClick = { onCapture(annotation) }, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("改用目前狀態建立新基準") }
             }
             if (comparison != null) {
                 OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(8.dp)) {

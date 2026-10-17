@@ -23,9 +23,11 @@
 ### Change Lab
 
 - 一鍵保存變更前基準，再以相同的 DNS、HTTPS 與 Fastly 測項重測。
+- 探測前短暫等待 Android 的活動網路狀態穩定，降低切換 Wi-Fi／VPN 過程中的瞬時誤判。
+- 可為變更前與變更後加入本機註記，記下當時網路情境與實際操作。
 - 比較連線路徑、公開 IP、DNS 上游、Android 驗證狀態、通過項目與 Fastly 平均延遲。
 - 結論保留原始證據，不用不透明的健康分數。
-- 可預覽並匯出版本化 JSON 診斷膠囊；公開 IP、本機 IP 與閘道預設遮蔽。
+- 可預覽並匯出版本化 JSON 或可讀文字診斷膠囊；公開 IP、本機 IP 與閘道預設遮蔽。
 
 ### 持續監控
 
@@ -125,6 +127,7 @@ app/src/main/java/tw/xiaoxin/networktool/
 - [系統設計](docs/SYSTEM_DESIGN.md)
 - [開發決策／ADR](docs/DEVELOPMENT_DECISIONS.md)
 - [產品 Roadmap](docs/ROADMAP.md)
+- [Phase 3 實作計畫](docs/PHASE3_PLAN.md)
 - [第三方參考與授權](THIRD_PARTY_REFERENCES.md)
 
 ## 授權
