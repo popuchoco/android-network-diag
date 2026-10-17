@@ -12,6 +12,8 @@ object ServiceState {
 
     private val _dnsError = MutableStateFlow<String?>(null)
     val dnsError = _dnsError.asStateFlow()
+    private val _dnsVerification = MutableStateFlow<String?>(null)
+    val dnsVerification = _dnsVerification.asStateFlow()
 
     fun setMonitoring(active: Boolean) {
         _monitoring.value = active
@@ -19,6 +21,10 @@ object ServiceState {
 
     fun setDnsUpstream(upstream: String?) {
         _dnsUpstream.value = upstream
+    }
+
+    fun setDnsVerification(status: String?) {
+        _dnsVerification.value = status
     }
 
     fun reportDnsError(message: String) {

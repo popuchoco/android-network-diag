@@ -24,16 +24,16 @@ The differentiating product direction is maintained in [PRODUCT_STRATEGY.md](PRO
 - Explicit consecutive-failure counter in continuous monitoring.
 - DNS selection state stored as a Bundle-safe provider ID, with VPN consent cancellation handled without starting the service.
 - Android 17 field validation on 2026-10-14 confirmed that the DNS screen remained stable and the Google DNS-only VPN started successfully; see [DEVICE_TEST_RESULTS.md](DEVICE_TEST_RESULTS.md). Other matrix cases remain open.
+- Versioned `DiagnosticSnapshot` persistence in Room, a Change Lab baseline/retest comparison, and privacy-previewed JSON Evidence Capsule export.
+- DNS-only VPN post-start resolution verification with visible state and diagnostic logging.
 
 ## Near term — high priority
 
 ### Change verification foundation
 
-- Define a versioned `DiagnosticSnapshot` containing network identity, transport, capabilities, VPN/tunnel context, DNS observations, public address family, routes, probes, and resolved service addresses.
-- Move durable evidence to Room and keep raw observations separate from derived explanations.
-- Build a Change Lab MVP: capture a baseline, apply or guide one explicit change, wait for network stabilization, rerun the same probes, and show only meaningful differences.
-- Verify DNS-only VPN activation with an actual resolver-path check; success means more than `VpnService.Builder.establish()` returning a descriptor.
-- Add a previewable, privacy-redacted Evidence Capsule v1 in text and versioned JSON.
+- Expand the initial snapshot schema with observable routes, DNS server properties, address-family classification, and resolved-service fields.
+- Add network-stabilization waiting and user annotations to the shipped manual Change Lab baseline/retest flow.
+- Add readable text output alongside the shipped versioned JSON Evidence Capsule.
 
 ### Route-conflict explanations
 

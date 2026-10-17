@@ -18,6 +18,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.util.concurrent.Executors
+import kotlin.concurrent.thread
 
 class DnsVpnService : VpnService() {
     private val vpnLock = Any()
@@ -35,7 +36,9 @@ class DnsVpnService : VpnService() {
             startForeground(NOTIFICATION_ID, notification(upstream))
             if (startVpn(upstream)) {
                 ServiceState.setDnsUpstream(upstream)
+                ServiceState.setDnsVerification("驗證中…")
                 DiagnosticLog.info(this, "DNS", "DNS-only VPN 已啟動，上游 $upstream")
+                verifyDnsPath(upstream)
                 Service.START_STICKY
             } else {
                 DiagnosticLog.error(this, "DNS", "系統未建立 VPN 介面")
@@ -114,6 +117,28 @@ class DnsVpnService : VpnService() {
         }
     }
 
+    private fun verifyDnsPath(upstream: String) {
+        thread(name = "dns-path-verification", isDaemon = true) {
+            runCatching {
+                Thread.sleep(300)
+                InetAddress.getAllByName("hinet.net").firstOrNull()?.hostAddress
+                    ?: error("解析未回傳位址")
+            }.onSuccess { address ->
+                if (ServiceState.dnsUpstream.value == upstream) {
+                    val status = "已驗證解析可用 · $address"
+                    ServiceState.setDnsVerification(status)
+                    DiagnosticLog.info(this, "DNS", "$upstream $status")
+                }
+            }.onFailure { error ->
+                if (ServiceState.dnsUpstream.value == upstream) {
+                    val status = "解析驗證失敗：${error.message ?: error.javaClass.simpleName}"
+                    ServiceState.setDnsVerification(status)
+                    DiagnosticLog.warning(this, "DNS", "$upstream $status")
+                }
+            }
+        }
+    }
+
     private fun notification(upstream: String): Notification {
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) nm.createNotificationChannel(NotificationChannel(CHANNEL, "DNS 服務", NotificationManager.IMPORTANCE_LOW))
@@ -125,6 +150,7 @@ class DnsVpnService : VpnService() {
 
     private fun cleanupVpn() {
         ServiceState.setDnsUpstream(null)
+        ServiceState.setDnsVerification(null)
         val descriptor = synchronized(vpnLock) { tun.also { tun = null } }
         runCatching { descriptor?.close() }
         executor.shutdownNow()

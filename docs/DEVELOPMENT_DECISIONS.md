@@ -89,3 +89,7 @@ Choosing a DNS provider is the primary action, so provider cards are actionable 
 ## ADR-021 — The product is a change verifier, not a tool grid
 
 The product's durable differentiation is evidence-backed before/after diagnosis. New protocol engines are accepted when they strengthen a user flow that captures a baseline, observes one explicit change, repeats comparable probes, and explains whether the result improved. Raw observations and derived inferences must remain separate, with confidence and evidence visible. The home experience should prioritize current state and the next useful action instead of accumulating independent utility buttons. The complete product thesis, staged epics, non-goals, and success metrics live in [PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md).
+
+## ADR-022 — Snapshots are versioned evidence with privacy-first export
+
+Change Lab stores raw diagnostic snapshots in an app-private Room database and retains at most 100 records. A separately testable comparator derives changes; it does not rewrite the evidence. Evidence Capsule JSON carries a schema version, defaults to redacting public/local IP and gateway data, and requires preview plus explicit opt-in before including addresses. Export uses the system document picker and never implies upload. The first implementation compares manual baselines; route capture, stabilization waiting, annotations, and readable text capsules remain follow-up work.

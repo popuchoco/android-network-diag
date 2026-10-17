@@ -20,6 +20,13 @@
   - 本 App 的 DNS-only VPN 或外部 VPN
   - 本機 IP、預設閘道與不需電話權限的行動網路可用性摘要
 
+### Change Lab
+
+- 一鍵保存變更前基準，再以相同的 DNS、HTTPS 與 Fastly 測項重測。
+- 比較連線路徑、公開 IP、DNS 上游、Android 驗證狀態、通過項目與 Fastly 平均延遲。
+- 結論保留原始證據，不用不透明的健康分數。
+- 可預覽並匯出版本化 JSON 診斷膠囊；公開 IP、本機 IP 與閘道預設遮蔽。
+
 ### 持續監控
 
 - 使用前景服務每 60 秒檢查一次外網。
@@ -40,6 +47,7 @@
 - 可透過本機 DNS-only `VpnService` 切換 UDP/IPv4 DNS。
 - VPN 路由只包含合成 DNS 位址 `10.77.0.2/32`，不攔截一般網路流量。
 - 也可複製 DNS-over-TLS 主機名稱並開啟 Android Private DNS 設定。
+- 啟動或切換後會實際解析測試網域，顯示 DNS 路徑是否可用，而不只檢查 VPN 介面是否建立。
 
 ### 診斷 Console
 

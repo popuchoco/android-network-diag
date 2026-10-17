@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 android {
     namespace = "tw.xiaoxin.networktool"
@@ -20,6 +21,7 @@ android {
     }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
+ksp { arg("room.schemaLocation", "$projectDir/schemas") }
 kotlin { jvmToolchain(17) }
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2024.10.01"))
@@ -33,6 +35,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
 }

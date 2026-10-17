@@ -117,7 +117,48 @@ private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boole
     val report by vm.report.collectAsStateWithLifecycle()
     val checking by vm.checking.collectAsStateWithLifecycle()
     val monitoring by ServiceState.monitoring.collectAsStateWithLifecycle()
+    val baseline by vm.baseline.collectAsStateWithLifecycle()
+    val comparison by vm.comparison.collectAsStateWithLifecycle()
+    val changeLabRunning by vm.changeLabRunning.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showEvidencePreview by remember { mutableStateOf(false) }
+    var includeAddresses by remember { mutableStateOf(false) }
+    var pendingEvidence by remember { mutableStateOf<String?>(null) }
+    val evidenceExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        val content = pendingEvidence
+        pendingEvidence = null
+        if (uri != null && content != null) {
+            runCatching { context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(content) } }
+                .onSuccess { DiagnosticLog.info(context, "Evidence", "診斷膠囊已匯出") }
+                .onFailure { DiagnosticLog.error(context, "Evidence", "匯出失敗：${it.message ?: it.javaClass.simpleName}") }
+        }
+    }
+    if (showEvidencePreview) {
+        val preview = vm.evidenceJson(includeAddresses).orEmpty()
+        AlertDialog(
+            onDismissRequest = { showEvidencePreview = false },
+            title = { Text("診斷膠囊預覽") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(includeAddresses, onCheckedChange = { includeAddresses = it })
+                        Text("包含公開／本機 IP 與閘道")
+                    }
+                    Text(if (includeAddresses) "敏感位址將原樣匯出。" else "預設已遮蔽位址資訊。", color = Ink.copy(alpha = .72f), fontSize = 13.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Text(preview.take(2_000), fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 15.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingEvidence = vm.evidenceJson(includeAddresses)
+                    showEvidencePreview = false
+                    evidenceExporter.launch("network-evidence-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())}.json")
+                }) { Text("匯出 JSON") }
+            },
+            dismissButton = { TextButton(onClick = { showEvidencePreview = false }) { Text("取消") } },
+        )
+    }
     Page("外網健檢", "不是只看 Wi‑Fi 圖示，而是實際確認裝置能否連到外部網路。", modifier) {
         report.connection?.takeIf { it.airplaneMode }?.let {
             val message = if (it.hasActiveNetwork) "Wi‑Fi 或 VPN 仍在連線，健檢會照常執行。" else "目前沒有活動網路，已暫停外部探測。"
@@ -141,6 +182,15 @@ private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boole
             ConnectionCard(connection)
         }
         Spacer(Modifier.height(16.dp))
+        ChangeLabCard(
+            baselineTime = baseline?.capturedAt,
+            comparison = comparison,
+            running = changeLabRunning,
+            onCapture = vm::captureBaseline,
+            onCompare = vm::compareWithBaseline,
+            onExport = { showEvidencePreview = true },
+        )
+        Spacer(Modifier.height(16.dp))
         report.probes.forEach { ProbeRow(it); Spacer(Modifier.height(8.dp)) }
         if (report.checkedAt != null) Text("最後檢查：${formatTime(report.checkedAt!!)}", color = Ink.copy(alpha = .5f), modifier = Modifier.padding(vertical = 8.dp))
         Spacer(Modifier.height(12.dp))
@@ -161,6 +211,62 @@ private fun HealthScreen(vm: MainViewModel, notificationPermissionGranted: Boole
         }
         Spacer(Modifier.height(8.dp))
         Text("持續監控會保留通知；首次失敗於 5 秒後複查，連續失敗才記為斷線。原始紀錄儲存在 App 私有 CSV。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
+    }
+}
+
+@Composable
+private fun ChangeLabCard(
+    baselineTime: Long?,
+    comparison: tw.xiaoxin.networktool.snapshot.SnapshotComparison?,
+    running: Boolean,
+    onCapture: () -> Unit,
+    onCompare: () -> Unit,
+    onExport: () -> Unit,
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(12.dp), border = CardDefaults.outlinedCardBorder()) {
+        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.CompareArrows, null, tint = Moss)
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text("Change Lab", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                    Text("驗證調整前後到底改變了什麼", color = Ink.copy(alpha = .65f), fontSize = 13.sp)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            if (baselineTime == null) {
+                Text("先建立基準，再切換 DNS、關閉加速器或重連 Wi‑Fi。", color = Ink.copy(alpha = .78f), fontSize = 14.sp, lineHeight = 20.sp)
+            } else {
+                Text("基準：${formatTime(baselineTime)}", color = Ink.copy(alpha = .72f), fontSize = 13.sp)
+            }
+            comparison?.let { result ->
+                Spacer(Modifier.height(12.dp))
+                Text(result.summary, fontWeight = FontWeight.Medium)
+                result.changes.forEach { change ->
+                    Spacer(Modifier.height(8.dp))
+                    Column(Modifier.fillMaxWidth().background(Canvas, RoundedCornerShape(6.dp)).padding(12.dp)) {
+                        Text(change.title, color = when (change.improved) { true -> Moss; false -> Color(0xFFFFC96B); null -> Ink }, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text("${change.before}  →  ${change.after}", color = Ink.copy(alpha = .72f), fontSize = 12.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = if (baselineTime == null) onCapture else onCompare, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = RoundedCornerShape(8.dp)) {
+                if (running) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Canvas)
+                else Icon(if (baselineTime == null) Icons.Outlined.BookmarkAdd else Icons.Outlined.Refresh, null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (running) "正在收集相同證據…" else if (baselineTime == null) "建立變更前基準" else "重新檢查並比較")
+            }
+            if (baselineTime != null) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(onClick = onCapture, enabled = !running, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("改用目前狀態建立新基準") }
+            }
+            if (comparison != null) {
+                OutlinedButton(onClick = onExport, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), shape = RoundedCornerShape(8.dp)) {
+                    Icon(Icons.Outlined.Inventory2, null); Spacer(Modifier.width(8.dp)); Text("預覽診斷膠囊")
+                }
+            }
+        }
     }
 }
 
@@ -229,6 +335,7 @@ private fun DnsScreen(modifier: Modifier) {
     val selected = dnsProviderById(selectedId)
     val dnsUpstream by ServiceState.dnsUpstream.collectAsStateWithLifecycle()
     val dnsError by ServiceState.dnsError.collectAsStateWithLifecycle()
+    val dnsVerification by ServiceState.dnsVerification.collectAsStateWithLifecycle()
     val active = dnsUpstream != null
     var pending by remember { mutableStateOf<DnsProvider?>(null) }
     val vpnLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -277,6 +384,9 @@ private fun DnsScreen(modifier: Modifier) {
         dnsProviders.forEach { provider ->
             DnsChoice(provider, selected.id == provider.id, dnsUpstream == provider.primary) { applyProvider(provider) }
             Spacer(Modifier.height(10.dp))
+        }
+        dnsVerification?.let { status ->
+            Text(status, color = if (status.startsWith("已驗證")) Moss else Ink.copy(alpha = .72f), fontSize = 13.sp, modifier = Modifier.padding(vertical = 4.dp))
         }
         Text("點選任一服務即可立即套用；切換到另一家不必先停止。", color = Ink.copy(alpha = .72f), fontSize = 14.sp, lineHeight = 20.sp)
         if (active) {

@@ -5,6 +5,7 @@
 ```text
 Compose UI
  ├─ External health screen ─ MainViewModel ─ NetworkDiagnostics
+│  └─ Change Lab ─ SnapshotFactory/Comparator ─ Room ─ Evidence Capsule
  ├─ HiNet screen ────────── MainViewModel ─ FastlyDiagnostics
  └─ DNS screen ──────────────────────────── DnsVpnService
 
@@ -23,6 +24,8 @@ The MVP uses one Android application module and keeps protocol engines separate 
 - `DnsVpnService`: captures only traffic addressed to the VPN-provided DNS IP, forwards UDP DNS to the selected resolver on a protected socket, and constructs the reply packet locally. Establishment and forwarding failures are published through `ServiceState`, allowing the visible DNS screen to show an actionable error even though the failure occurs asynchronously inside the service.
 - The DNS provider cards are direct actions rather than a two-step selection form. The first tap may require Android VPN consent; later taps replace the upstream in place, while stopping DNS remains a separate secondary action.
 - Compose screens: presentation and user consent entry points only; network work stays off the main thread.
+- `DiagnosticSnapshot`: versioned raw observations from the health and Fastly engines. `SnapshotComparator` derives before/after changes without mutating observations. Room retains the newest 100 snapshots and restores only records explicitly labeled as baselines.
+- `SnapshotCodec`: maps Room entities and creates a versioned Evidence Capsule. Address fields are redacted by default and included only after the user opts in from the export preview.
 
 ## Data and privacy
 
@@ -30,6 +33,7 @@ The MVP uses one Android application module and keeps protocol engines separate 
 - No analytics, account, remote database, or telemetry SDK is included.
 - The DNS VPN does not capture general traffic because its route contains only the synthetic DNS address (`10.77.0.2/32`).
 - Public-IP lookup contacts `api64.ipify.org`, then `ifconfig.me/ip` only on failure; connectivity probes contact the providers named in the UI.
+- Change Lab snapshots remain in the app-private Room database. Evidence Capsules use the Android document picker and are never uploaded automatically.
 
 ## Diagnostic console
 
